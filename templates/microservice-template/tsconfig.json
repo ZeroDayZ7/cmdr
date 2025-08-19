@@ -1,0 +1,13 @@
+// @ts-nocheck
+{
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "composite": false,
+    "incremental": false
+  },
+  "include": ["src/**/*" ],
+  "exclude": []
+}

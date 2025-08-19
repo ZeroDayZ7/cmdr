@@ -1,0 +1,15 @@
+// Auth-service - prod
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": false,
+    "composite": false,
+    "incremental": false,
+    "sourceMap": false,
+    "declaration": false,
+    "removeComments": true,
+    "baseUrl": "./src",
+  },
+  "include": ["src/**/*"]
+}
