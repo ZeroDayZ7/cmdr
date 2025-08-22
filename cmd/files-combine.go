@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ Example:
 		writer := bufio.NewWriter(file)
 
 		// Initial empty lines (4)
-		for i := 0; i < 4; i++ {
+		for range 4 {
 			writer.WriteString("\n")
 		}
 
@@ -72,7 +73,7 @@ Example:
 
 			if !info.IsDir() && hasAllowedExtension(path, extList) {
 				_, fileName := filepath.Split(path)
-				writer.WriteString(fmt.Sprintf("───────────── %s ─────────────\n", fileName))
+				fmt.Fprintf(writer, "───────────── %s ─────────────\n", fileName)
 
 				content, readErr := os.ReadFile(path)
 				if readErr != nil {
@@ -96,15 +97,16 @@ Example:
 }
 
 func init() {
-	filesCombineCmd.Flags().StringVarP(&extensions, "extensions", "r", "", "Comma-separated list of file extensions (e.g. ts,tsx,json)")
+	filesCombineCmd.Flags().StringVarP(&extensions, "extensions", "e", "", "Comma-separated list of file extensions (e.g. ts,tsx,json)")
 	filesCombineCmd.Flags().StringVarP(&outputFile, "name", "n", "", "Name of the output file")
-	filesCombineCmd.Flags().StringVar(&excludeDirs, "exclude", "node_modules,dist", "Comma-separated list of directories to exclude")
+	filesCombineCmd.Flags().StringVarP(&excludeDirs, "exclude", "x", "node_modules,dist", "Comma-separated list of directories to exclude")
+
 	rootCmd.AddCommand(filesCombineCmd)
 }
 
 func parseExtensions(input string) []string {
 	var exts []string
-	for _, e := range strings.Split(input, ",") {
+	for e := range strings.SplitSeq(input, ",") {
 		e = strings.TrimSpace(strings.ToLower(e))
 		if e != "" {
 			if !strings.HasPrefix(e, ".") {
@@ -118,10 +120,10 @@ func parseExtensions(input string) []string {
 
 func parseExcludes(input string) []string {
 	var dirs []string
-	for _, d := range strings.Split(input, ",") {
-		d = strings.TrimSpace(d)
-		if d != "" {
-			dirs = append(dirs, d)
+	for d := range strings.SplitSeq(input, ",") {
+		trimmed := strings.TrimSpace(d)
+		if trimmed != "" {
+			dirs = append(dirs, trimmed)
 		}
 	}
 	return dirs
@@ -138,10 +140,5 @@ func shouldExclude(path string, excludeList []string) bool {
 
 func hasAllowedExtension(path string, exts []string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-	for _, e := range exts {
-		if e == ext {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(exts, ext)
 }
