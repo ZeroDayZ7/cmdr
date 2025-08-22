@@ -20,7 +20,7 @@ Or clone and build manually:
 ```bash
 git clone https://github.com/ZeroDayZ7/cmdr.git
 cd cmdr
-go build -o cmdr.exe
+go build -o bin/cmdr.exe
 ```
 
 ## Usage
