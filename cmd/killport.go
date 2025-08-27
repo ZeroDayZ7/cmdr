@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,13 +8,15 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/username/cli/internal/utils"
 )
 
 var port int
 
 var killPortCmd = &cobra.Command{
-	Use:   "killport",
-	Short: "Find and optionally kill the process using a port",
+	Use:     "killport",
+	Short:   "Find and optionally kill the process using a port",
+	Aliases: []string{"kport"},
 	Long: `Example usage:
   cmdr killport -p 3000
   Will display the process using port 3000 and allow you to kill it.`,
@@ -60,7 +61,7 @@ func handleUnix(port int) {
 	psCmd.Stdout = os.Stdout
 	psCmd.Run()
 
-	confirmAndKill(pid, "unix")
+	utils.ConfirmAndKill(pid, "unix", force)
 }
 
 // ==========================
@@ -98,40 +99,5 @@ func handleWindows(port int) {
 	tasklist.Stdout = os.Stdout
 	tasklist.Run()
 
-	confirmAndKill(pid, "windows")
-}
-
-// ==========================
-// Confirm and Kill
-// ==========================
-func confirmAndKill(pid string, osType string) {
-	if force {
-		killProcess(pid, osType)
-		return
-	}
-
-	fmt.Print("Do you want to kill this process? (y/n): ")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	if strings.ToLower(input) == "y" {
-		killProcess(pid, osType)
-	} else {
-		fmt.Println("Process left running.")
-	}
-}
-
-func killProcess(pid string, osType string) {
-	var cmd *exec.Cmd
-	if osType == "windows" {
-		cmd = exec.Command("taskkill", "/PID", pid, "/F")
-	} else {
-		cmd = exec.Command("kill", "-9", pid)
-	}
-	err := cmd.Run()
-	if err != nil {
-		fmt.Println("Error killing process:", err)
-		return
-	}
-	fmt.Printf("Process %s killed.\n", pid)
+	utils.ConfirmAndKill(pid, "windows", force)
 }
