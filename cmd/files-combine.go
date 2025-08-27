@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/username/cli/internal/utils"
 )
 
 var (
@@ -21,30 +22,16 @@ var filesCombineCmd = &cobra.Command{
 	Use:     "files-combine",
 	Aliases: []string{"fc", "combine-files"},
 	Short:   "Combine contents of files with chosen extensions into one file",
-	Long: `Scans the current directory and all subdirectories for files with
-selected extensions and combines them into a single file with headers.
-
-Example:
-  cmdr files-combine -r ts,tsx,jsx,json -n my-combined.txt
-`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if outputFile == "" {
 			outputFile = "combined.txt"
 		}
-
 		if extensions == "" {
 			extensions = "ts,tsx,jsx,json"
 		}
 
-		// Parse extensions into a slice
 		extList := parseExtensions(extensions)
-		if len(extList) == 0 {
-			fmt.Println("No valid extensions provided.")
-			return
-		}
-
-		fmt.Printf("Combining files with extensions: %v\n", extList)
-		fmt.Printf("Output file: %s\n", outputFile)
+		excludeList := utils.ParseCommaSeparated(excludeDirs)
 
 		file, err := os.Create(outputFile)
 		if err != nil {
@@ -55,19 +42,17 @@ Example:
 
 		writer := bufio.NewWriter(file)
 
-		// Initial empty lines (4)
-		for range 4 {
+		// Initial empty lines
+		for range [4]struct{}{} {
 			writer.WriteString("\n")
 		}
-
-		excludeList := parseExcludes(excludeDirs)
 
 		err = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 
-			if info.IsDir() && shouldExclude(path, excludeList) {
+			if info.IsDir() && utils.ShouldExclude(path, excludeList) {
 				return filepath.SkipDir
 			}
 
@@ -99,7 +84,7 @@ Example:
 func init() {
 	filesCombineCmd.Flags().StringVarP(&extensions, "extensions", "e", "", "Comma-separated list of file extensions (e.g. ts,tsx,json)")
 	filesCombineCmd.Flags().StringVarP(&outputFile, "name", "n", "", "Name of the output file")
-	filesCombineCmd.Flags().StringVarP(&excludeDirs, "exclude", "x", "node_modules,dist", "Comma-separated list of directories to exclude")
+	filesCombineCmd.Flags().StringVarP(&excludeDirs, "exclude", "x", "node_modules,dist", "Comma-separated list of directories/files/extensions to exclude")
 
 	rootCmd.AddCommand(filesCombineCmd)
 }
@@ -116,26 +101,6 @@ func parseExtensions(input string) []string {
 		}
 	}
 	return exts
-}
-
-func parseExcludes(input string) []string {
-	var dirs []string
-	for d := range strings.SplitSeq(input, ",") {
-		trimmed := strings.TrimSpace(d)
-		if trimmed != "" {
-			dirs = append(dirs, trimmed)
-		}
-	}
-	return dirs
-}
-
-func shouldExclude(path string, excludeList []string) bool {
-	for _, ex := range excludeList {
-		if strings.Contains(path, string(filepath.Separator)+ex) {
-			return true
-		}
-	}
-	return false
 }
 
 func hasAllowedExtension(path string, exts []string) bool {
