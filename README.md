@@ -36,13 +36,13 @@ The `ask` command allows you to send a question to an API (e.g., Gemini API) and
 cmdr ask -q "test"
 ```
 
-#### Output:
+### Output:
 
 ```bash
 Response: Okay, I'm here! What would you like me to do?
 ```
 
-#### Configuration File
+### Configuration File
 
 When you first run the ask command, a .config.json file will be generated in the same directory as the executable. This file will look like this:
 
