@@ -10,11 +10,12 @@ import (
 
 var dirName string
 
-var clearCmd = &cobra.Command{
-	Use:   "clear",
+// cleanCmd deletes all directories with the specified name in the current project.
+var cleanCmd = &cobra.Command{
+	Use:   "clean",
 	Short: "Deletes all directories with the given name in the current project",
 	Long: `Example usage:
-  cmdr clear -d logs
+  cmdr clean -d logs
 Deletes all directories named "logs" in the current directory and subdirectories.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if dirName == "" {
@@ -22,9 +23,9 @@ Deletes all directories named "logs" in the current directory and subdirectories
 			return
 		}
 
-		fmt.Printf("Deleting all '%s' folders in the project...\n", dirName)
+		fmt.Printf("Cleaning all '%s' folders in the project...\n", dirName)
 
-		// Walk through current directory
+		// Walk through current directory recursively
 		err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -39,7 +40,7 @@ Deletes all directories named "logs" in the current directory and subdirectories
 		})
 
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Println("Error walking the path:", err)
 			return
 		}
 
@@ -48,6 +49,6 @@ Deletes all directories named "logs" in the current directory and subdirectories
 }
 
 func init() {
-	clearCmd.Flags().StringVarP(&dirName, "dir", "d", "", "Name of the directory to delete")
-	rootCmd.AddCommand(clearCmd)
+	cleanCmd.Flags().StringVarP(&dirName, "dir", "d", "", "Name of the directory to delete")
+	rootCmd.AddCommand(cleanCmd)
 }
