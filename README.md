@@ -28,7 +28,7 @@ Cmdr helps you run tasks like migrations, dev servers, and more.
 cmdr --help
 ```
 
-### Example Command: `ask`
+## Example Command: `ask`
 
 The `ask` command allows you to send a question to an API (e.g., Gemini API) and get an immediate response.
 
@@ -36,13 +36,13 @@ The `ask` command allows you to send a question to an API (e.g., Gemini API) and
 cmdr ask -q "test"
 ```
 
-### Output:
+## Output:
 
 ```bash
 Response: Okay, I'm here! What would you like me to do?
 ```
 
-### Configuration File
+## Configuration File
 
 When you first run the ask command, a .config.json file will be generated in the same directory as the executable. This file will look like this:
 
@@ -56,7 +56,7 @@ When you first run the ask command, a .config.json file will be generated in the
 ```
 
 
-### Other Available Commands
+## Other Available Commands
 
 Cmdr provides several commands to help with your Go and microservices tasks. Here’s a list of available commands:
 
@@ -88,11 +88,11 @@ Flags:
 Use "cmdr [command] --help" for more information about a command.
 ```
 
-### Flags
+## Flags
 
 * `-h`, `--help`: Display help for the `cmdr` command or any individual command.
 
-### Example: Ask Command with Additional File Flag
+## Example: Ask Command with Additional File Flag
 
 You can also send a file along with your query to the `ask` command using the `-f` flag:
 
