@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -46,7 +45,7 @@ var askCmd = &cobra.Command{
 		files, _ := cmd.Flags().GetStringArray("file")
 		if len(files) > 0 {
 			for _, file := range files {
-				fileContent, err := ioutil.ReadFile(file)
+				fileContent, err := os.ReadFile(file)
 				if err != nil {
 					fmt.Printf("Error reading file %s: %v\n", file, err)
 					return

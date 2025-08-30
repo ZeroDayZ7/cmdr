@@ -19,27 +19,33 @@ func ParseCommaSeparated(input string) []string {
 
 // ShouldExclude checks if a file or folder should be excluded
 // Supports folder names, file names, and extensions (e.g., ".exe")
-func ShouldExclude(path string, excludeList []string) bool {
-	base := filepath.Base(path)
-	ext := strings.ToLower(filepath.Ext(path))
+func ShouldExclude(name string, excludeList []string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
 
-	for _, ex := range excludeList {
-		ex = strings.ToLower(strings.TrimSpace(ex))
-		if ex == "" {
+	for _, e := range excludeList {
+		e = strings.TrimSpace(e)
+		if e == "" {
 			continue
 		}
 
-		if ex[0] == '.' {
-			// treat as extension
-			if ext == ex {
-				return true
-			}
-		} else {
-			// treat as folder/file name
-			if base == ex || strings.Contains(path, string(filepath.Separator)+ex) {
-				return true
-			}
+		// Dopasowanie dokładnej nazwy pliku/folderu
+		if name == e {
+			return true
+		}
+
+		// Dopasowanie po rozszerzeniu (*.md)
+		if strings.HasPrefix(e, "*.") && strings.HasSuffix(name, e[1:]) {
+			return true
+		}
+
+		// Dopasowanie folderów względnych (np. ./bin)
+		if strings.HasSuffix(e, string(filepath.Separator)) && name == strings.TrimSuffix(e, string(filepath.Separator)) {
+			return true
 		}
 	}
+
 	return false
 }
