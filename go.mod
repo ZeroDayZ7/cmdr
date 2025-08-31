@@ -1,4 +1,4 @@
-module github.com/username/cli
+module github.com/zerodayz7/cmdr
 
 go 1.25.0
 

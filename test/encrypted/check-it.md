@@ -1,0 +1,1 @@
+cmdr crypto decrypt -f encrypted/test.sf -k e465005f5b9e0b078ddbd4972a6f9fe25d9e4e0e7156c65569a4515ae636f2c8

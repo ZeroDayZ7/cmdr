@@ -1,6 +1,6 @@
 package main
 
-import "github.com/username/cli/cmd"
+import "github.com/zerodayz7/cmdr/cmd"
 
 func main() {
 	cmd.Execute()

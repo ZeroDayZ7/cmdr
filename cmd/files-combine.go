@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/username/cli/internal/utils"
+	"github.com/zerodayz7/cmdr/internal/utils"
 )
 
 var (
