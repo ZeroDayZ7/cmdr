@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/zerodayz7/cmdr/cmd/crypto"
 	"github.com/zerodayz7/cmdr/cmd/general"
+	"github.com/zerodayz7/cmdr/cmd/system"
+	"github.com/zerodayz7/cmdr/cmd/tools"
 )
 
 var rootCmd = &cobra.Command{
@@ -33,5 +35,8 @@ func init() {
 		general.NewVersionCmd(), // version
 		general.NewTreeCmd(),    // Tree
 		general.NewAskCmd(),     // Ask
+		tools.NewFilesCombineCmd(),
+		tools.NewCleanCmd(),
+		system.NewChecksumCmd(),
 	)
 }
