@@ -1,4 +1,4 @@
-package cmd
+package general
 
 import (
 	"bytes"
@@ -12,38 +12,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var askCmd = &cobra.Command{
-	Use:     "ask",
-	Aliases: []string{"query", "ask-api"},
-	Short:   "Ask questions to an API and get the answer",
-	Long:    `This command sends a query to an API (like Gemini) and gets a response. You can also add files to the query using the -f flag.`,
-	Run: func(cmd *cobra.Command, args []string) {
+func NewAskCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "ask",
+		Aliases: []string{"query", "ask-api"},
+		Short:   "Ask questions to an API and get the answer",
+		Long: `This command sends a query to an API (like Gemini) and gets a response. 
+You can also add files to the query using the -f flag.`,
+		Run: func(cmd *cobra.Command, args []string) {
 
-		query, _ := cmd.Flags().GetString("query")
-		if query == "" {
-			fmt.Println("Please provide a query using -q flag.")
-			return
-		}
+			query, _ := cmd.Flags().GetString("query")
+			if query == "" {
+				fmt.Println("Please provide a query using -q flag.")
+				return
+			}
 
-		apiConfig, err := readApiConfig()
-		if err != nil {
-			fmt.Println("Error reading API config:", err)
-			return
-		}
+			apiConfig, err := readApiConfig()
+			if err != nil {
+				fmt.Println("Error reading API config:", err)
+				return
+			}
 
-		service, _ := cmd.Flags().GetString("model")
-		if service == "" {
-			service = "gemini"
-		}
+			service, _ := cmd.Flags().GetString("model")
+			if service == "" {
+				service = "gemini"
+			}
 
-		apiConfigForService, exists := apiConfig[service]
-		if !exists {
-			fmt.Println("Error: Service configuration for", service, "not found.")
-			return
-		}
+			apiConfigForService, exists := apiConfig[service]
+			if !exists {
+				fmt.Println("Error: Service configuration for", service, "not found.")
+				return
+			}
 
-		files, _ := cmd.Flags().GetStringArray("file")
-		if len(files) > 0 {
+			files, _ := cmd.Flags().GetStringArray("file")
 			for _, file := range files {
 				fileContent, err := os.ReadFile(file)
 				if err != nil {
@@ -52,15 +53,43 @@ var askCmd = &cobra.Command{
 				}
 				query += "\n" + string(fileContent)
 			}
-		}
 
-		data, err := fetchGeminiData(apiConfigForService.URL, apiConfigForService.ApiKey, query)
-		if err != nil {
-			fmt.Println("Error fetching data:", err)
-			return
-		}
-		fmt.Println("Response:", data)
-	},
+			data, err := fetchGeminiData(apiConfigForService.URL, apiConfigForService.ApiKey, query)
+			if err != nil {
+				fmt.Println("Error fetching data:", err)
+				return
+			}
+
+			// Parsowanie JSON-a, żeby wyciągnąć tylko tekst odpowiedzi
+			var resp struct {
+				Candidates []struct {
+					Content struct {
+						Parts []struct {
+							Text string `json:"text"`
+						} `json:"parts"`
+					} `json:"content"`
+				} `json:"candidates"`
+			}
+			if err := json.Unmarshal([]byte(data), &resp); err != nil {
+				fmt.Println("Error parsing response:", err)
+				return
+			}
+
+			if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+				fmt.Println(resp.Candidates[0].Content.Parts[0].Text)
+			} else {
+				fmt.Println("No response text received.")
+			}
+
+		},
+	}
+
+	// Flags
+	cmd.Flags().StringP("model", "m", "gemini", "The model to use (e.g. gemini or other_service)")
+	cmd.Flags().StringP("query", "q", "", "The query to send to Gemini API")
+	cmd.Flags().StringArrayP("file", "f", []string{}, "Add files to the query")
+
+	return cmd
 }
 
 func readApiConfig() (map[string]struct {
@@ -73,7 +102,6 @@ func readApiConfig() (map[string]struct {
 	}
 
 	dir := filepath.Dir(exePath)
-
 	configPath := filepath.Join(dir, ".config.json")
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -112,7 +140,6 @@ func readApiConfig() (map[string]struct {
 }
 
 func fetchGeminiData(url, apiKey, query string) (string, error) {
-
 	requestBody := map[string]any{
 		"contents": []map[string]any{
 			{
@@ -149,11 +176,4 @@ func fetchGeminiData(url, apiKey, query string) (string, error) {
 	}
 
 	return string(body), nil
-}
-
-func init() {
-	rootCmd.AddCommand(askCmd)
-	askCmd.Flags().StringP("model", "m", "gemini", "The model to use (e.g. gemini or other_service)")
-	askCmd.Flags().StringP("query", "q", "", "The query to send to Gemini API")
-	askCmd.Flags().StringArrayP("file", "f", []string{}, "Add files to the query")
 }

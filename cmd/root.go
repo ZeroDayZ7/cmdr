@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/zerodayz7/cmdr/cmd/crypto"
+	"github.com/zerodayz7/cmdr/cmd/general"
 )
 
 var rootCmd = &cobra.Command{
@@ -25,9 +26,12 @@ func Execute() {
 }
 
 func init() {
-	// Rejestracja podkomend
 	rootCmd.AddCommand(
-		crypto.NewCmd(), // <-- to z Twojego crypto.go
-		// możesz dodać kolejne, np. ask.NewCmd(), hashdir.NewCmd(), itp.
+		crypto.NewCmd(),         // crypto.go
+		general.NewHelloCmd(),   // hello
+		general.NewInfoCmd(),    // info
+		general.NewVersionCmd(), // version
+		general.NewTreeCmd(),    // Tree
+		general.NewAskCmd(),     // Ask
 	)
 }

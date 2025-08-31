@@ -1,4 +1,4 @@
-package cmd
+package general
 
 import (
 	"fmt"
@@ -6,13 +6,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var infoCmd = &cobra.Command{
-	Use:   "info",
-	Short: "Show recommended Go project structure and common use cases",
-	Long: `Displays an example folder structure for a professional Go application 
+// NewInfoCmd tworzy podkomendę info
+func NewInfoCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "info",
+		Short: "Show recommended Go project structure and common use cases",
+		Long: `Displays an example folder structure for a professional Go application 
 and a list of common use cases for the Go programming language.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(`
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(`
 ### Folder structure for a large Go application
 
 Example of a commonly used layout in professional projects:
@@ -74,10 +76,7 @@ Example of a commonly used layout in professional projects:
 20. Lightweight desktop applications (Fyne, Wails)
 
 Go is valued for its simplicity, performance, and reliability — making it a strong choice for modern cloud and distributed environments.
-		`)
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(infoCmd)
+			`)
+		},
+	}
 }
