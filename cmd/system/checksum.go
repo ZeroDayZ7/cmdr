@@ -25,11 +25,11 @@ func NewChecksumCmd() *cobra.Command {
 		Short:   "Compute checksum of a file",
 		Long: `This command calculates the checksum of a given file.
 Examples:
-  cmdr checksum test.txt          # prints checksum to console
-  cmdr checksum test.txt -o       # auto-generate file test.sha256
-  cmdr checksum test.txt -o -a sha512 # auto-generate file test.sha512
-  cmdr checksum test.txt -f mysum.txt # custom output file
-  cmdr checksum test.txt -a md5
+  cmdr checksum example.txt          # prints checksum to console
+  cmdr checksum example.txt -o       # auto-generate file example.sha256
+  cmdr checksum example.txt -o -a sha512 # auto-generate file example.sha512
+  cmdr checksum example.txt -f mysum.txt # custom output file
+  cmdr checksum example.txt -a md5
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

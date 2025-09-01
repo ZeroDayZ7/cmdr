@@ -29,14 +29,19 @@ func Execute() {
 
 func init() {
 	rootCmd.AddCommand(
-		crypto.NewCmd(),         // crypto.go
-		general.NewHelloCmd(),   // hello
-		general.NewInfoCmd(),    // info
-		general.NewVersionCmd(), // version
-		general.NewTreeCmd(),    // Tree
-		general.NewAskCmd(),     // Ask
-		tools.NewFilesCombineCmd(),
-		tools.NewCleanCmd(),
-		system.NewChecksumCmd(),
+		crypto.NewCmd(),              // crypto
+		general.NewHelloCmd(),        // hello
+		general.NewInfoCmd(),         // info
+		general.NewVersionCmd(),      // version
+		general.NewTreeCmd(),         // tree
+		general.NewAskCmd(),          // ask
+		tools.NewFilesCombineCmd(),   // files-combine
+		tools.NewCleanCmd(),          // clean
+		tools.NewCreateServiceCmd(),  // create-service
+		tools.NewRemoveCommentsCmd(), // remove-comments
+		system.NewChecksumCmd(),      // checksum
+		system.NewKillPortCmd(),      // killport
+		system.NewKillProcessCmd(),   // killprocess
+
 	)
 }
