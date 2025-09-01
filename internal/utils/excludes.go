@@ -5,10 +5,11 @@ import (
 	"strings"
 )
 
-// ParseCommaSeparated splits string by comma and trims spaces
+// #region ParseCommaSeparated
+// Splits a comma-separated string into trimmed, non-empty items.
 func ParseCommaSeparated(input string) []string {
 	var items []string
-	for s := range strings.SplitSeq(input, ",") {
+	for _, s := range strings.Split(input, ",") { // używamy Split zamiast SplitSeq
 		s = strings.TrimSpace(s)
 		if s != "" {
 			items = append(items, s)
@@ -17,8 +18,8 @@ func ParseCommaSeparated(input string) []string {
 	return items
 }
 
-// ShouldExclude checks if a file or folder should be excluded
-// Supports folder names, file names, and extensions (e.g., ".exe")
+// #region ShouldExclude
+// Checks if a file or folder should be excluded based on names, extensions, or folder paths.
 func ShouldExclude(name string, excludeList []string) bool {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -31,18 +32,19 @@ func ShouldExclude(name string, excludeList []string) bool {
 			continue
 		}
 
-		// Dopasowanie dokładnej nazwy pliku/folderu
+		// Exact match for file/folder names
 		if name == e {
 			return true
 		}
 
-		// Dopasowanie po rozszerzeniu (*.md)
+		// Match by extension (*.ext)
 		if strings.HasPrefix(e, "*.") && strings.HasSuffix(name, e[1:]) {
 			return true
 		}
 
-		// Dopasowanie folderów względnych (np. ./bin)
-		if strings.HasSuffix(e, string(filepath.Separator)) && name == strings.TrimSuffix(e, string(filepath.Separator)) {
+		// Match relative folders (e.g., ./bin)
+		if strings.HasSuffix(e, string(filepath.Separator)) &&
+			name == strings.TrimSuffix(e, string(filepath.Separator)) {
 			return true
 		}
 	}

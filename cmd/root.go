@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/zerodayz7/cmdr/cmd/crypto"
 	"github.com/zerodayz7/cmdr/cmd/general"
+	"github.com/zerodayz7/cmdr/cmd/info"
 	"github.com/zerodayz7/cmdr/cmd/system"
 	"github.com/zerodayz7/cmdr/cmd/tools"
 )
@@ -31,7 +32,7 @@ func init() {
 	rootCmd.AddCommand(
 		crypto.NewCmd(),              // crypto
 		general.NewHelloCmd(),        // hello
-		general.NewInfoCmd(),         // info
+		info.NewInfoCmd(),            // info
 		general.NewVersionCmd(),      // version
 		general.NewTreeCmd(),         // tree
 		general.NewAskCmd(),          // ask

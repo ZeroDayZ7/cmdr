@@ -7,7 +7,8 @@ import (
 	"strings"
 )
 
-// GenerateFileWithDefaults zapisuje listę domyślnych wartości do pliku
+// #region GenerateFileWithDefaults
+// Generates a file with default ignore values. Defaults to ".cmdrignore".
 func GenerateFileWithDefaults(filename string, defaults []string) error {
 	if filename == "" {
 		filename = ".cmdrignore"
@@ -48,7 +49,8 @@ func GenerateFileWithDefaults(filename string, defaults []string) error {
 	return err
 }
 
-// ReadIgnoreFile odczytuje zawartość pliku ignore jako listę
+// #region ReadIgnoreFile
+// Reads an ignore file and returns its content as a list of non-empty trimmed lines.
 func ReadIgnoreFile(filename string) ([]string, error) {
 	if filename == "" {
 		filename = ".cmdrignore"
