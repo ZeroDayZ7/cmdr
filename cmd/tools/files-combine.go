@@ -17,6 +17,7 @@ var (
 	extensions     string
 	excludeDirs    string
 	generateIgnore bool
+	dartOnly       bool
 )
 
 func NewFilesCombineCmd() *cobra.Command {
@@ -24,14 +25,7 @@ func NewFilesCombineCmd() *cobra.Command {
 		Use:     "files-combine",
 		Aliases: []string{"fc", "combine-files"},
 		Short:   "Combine contents of files with chosen extensions into one file",
-		Long: `Example:
-  cmdr files-combine
-  cmdr files-combine -n combined.txt -e ts,tsx,json
-  cmdr files-combine -x .git,node_modules
-  cmdr files-combine --generate-ignore
-`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Generate ignore file if requested
 			if generateIgnore {
 				return utils.GenerateFileWithDefaults(".files-combineignore", []string{
 					"node_modules",
@@ -43,11 +37,20 @@ func NewFilesCombineCmd() *cobra.Command {
 			if outputFile == "" {
 				outputFile = "combined.txt"
 			}
+
+			if dartOnly {
+				extensions = "dart"
+				excludeDirs = strings.Join([]string{
+					excludeDirs,
+					".g.dart",
+					".freezed.dart",
+				}, ",")
+			}
+
 			if extensions == "" {
 				extensions = "ts,tsx,jsx,json"
 			}
 
-			// Read ignore file + CLI excludes
 			defaultIgnore, _ := utils.ReadIgnoreFile(".files-combineignore")
 			excludeList := append(defaultIgnore, utils.ParseCommaSeparated(excludeDirs)...)
 
@@ -55,13 +58,11 @@ func NewFilesCombineCmd() *cobra.Command {
 
 			file, err := os.Create(outputFile)
 			if err != nil {
-				return fmt.Errorf("error creating output file: %w", err)
+				return err
 			}
 			defer file.Close()
 
 			writer := bufio.NewWriter(file)
-
-			// Initial empty lines
 			for range [4]struct{}{} {
 				writer.WriteString("\n")
 			}
@@ -76,13 +77,16 @@ func NewFilesCombineCmd() *cobra.Command {
 				}
 
 				if !info.IsDir() && hasAllowedExtension(path, extList) {
-					_, fileName := filepath.Split(path)
-					fmt.Fprintf(writer, "───────────── %s ─────────────\n", fileName)
+					name := info.Name()
+
+					if dartOnly && isGeneratedDartFile(name) {
+						return nil
+					}
+
+					fmt.Fprintf(writer, "───────────── %s ─────────────\n", name)
 
 					content, readErr := os.ReadFile(path)
-					if readErr != nil {
-						fmt.Fprintf(writer, "Error reading file: %v\n", readErr)
-					} else {
+					if readErr == nil {
 						writer.Write(content)
 					}
 					writer.WriteString("\n\n")
@@ -91,20 +95,20 @@ func NewFilesCombineCmd() *cobra.Command {
 			})
 
 			if err != nil {
-				return fmt.Errorf("error while scanning files: %w", err)
+				return err
 			}
 
 			writer.Flush()
-			fmt.Printf("✅ Finished! Combined file: %s\n", outputFile)
+			fmt.Printf("Finished! Combined file: %s\n", outputFile)
 			return nil
 		},
 	}
 
-	// Flags
-	cmd.Flags().StringVarP(&extensions, "extensions", "e", "", "Comma-separated list of file extensions (e.g. ts,tsx,json)")
+	cmd.Flags().StringVarP(&extensions, "extensions", "e", "", "Comma-separated list of file extensions")
 	cmd.Flags().StringVarP(&outputFile, "name", "n", "", "Name of the output file")
-	cmd.Flags().StringVarP(&excludeDirs, "exclude", "x", "node_modules,dist", "Comma-separated list of directories/files/extensions to exclude")
-	cmd.Flags().BoolVarP(&generateIgnore, "generate-ignore", "g", false, "Generate a default .files-combineignore file")
+	cmd.Flags().StringVarP(&excludeDirs, "exclude", "x", "node_modules,dist", "Excluded directories/files")
+	cmd.Flags().BoolVarP(&generateIgnore, "generate-ignore", "g", false, "Generate ignore file")
+	cmd.Flags().BoolVarP(&dartOnly, "dart", "d", false, "Dart mode")
 
 	return cmd
 }
@@ -126,4 +130,9 @@ func parseExtensions(input string) []string {
 func hasAllowedExtension(path string, exts []string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	return slices.Contains(exts, ext)
+}
+
+func isGeneratedDartFile(name string) bool {
+	return strings.HasSuffix(name, ".g.dart") ||
+		strings.HasSuffix(name, ".freezed.dart")
 }
