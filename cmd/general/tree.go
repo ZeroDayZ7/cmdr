@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	output  string   // Output file path
-	exclude []string // Files/folders to exclude
-	format  string   // Output format: ascii|json|csv|md
+	output          string
+	exclude         []string
+	format          string
+	copyToClipboard bool
 )
 
 func NewTreeCmd() *cobra.Command {
@@ -41,19 +42,25 @@ func NewTreeCmd() *cobra.Command {
 				path = args[0]
 			}
 
+			info, err := os.Stat(path)
+			if err != nil {
+				return err
+			}
+
 			defaultIgnore, _ := utils.ReadIgnoreFile(".cmdrignore")
 			excludeList := append(defaultIgnore, utils.ParseCommaSeparated(strings.Join(exclude, ","))...)
+
+			var result string
 
 			switch format {
 			case "ascii":
 				var builder strings.Builder
+				abs, _ := filepath.Abs(path)
+				builder.WriteString(filepath.Base(abs) + "\n")
 				if err := printTree(path, "", excludeList, &builder); err != nil {
 					return err
 				}
-				if output != "" {
-					return os.WriteFile(output, []byte(builder.String()), 0644)
-				}
-				fmt.Print(builder.String())
+				result = builder.String()
 
 			case "json":
 				node, err := buildJSONTree(path, excludeList)
@@ -61,10 +68,7 @@ func NewTreeCmd() *cobra.Command {
 					return err
 				}
 				data, _ := json.MarshalIndent(node, "", "  ")
-				if output != "" {
-					return os.WriteFile(output, data, 0644)
-				}
-				fmt.Println(string(data))
+				result = string(data)
 
 			case "csv":
 				records := [][]string{{"path", "type"}}
@@ -75,46 +79,54 @@ func NewTreeCmd() *cobra.Command {
 				w := csv.NewWriter(&buf)
 				w.WriteAll(records)
 				w.Flush()
-				if output != "" {
-					return os.WriteFile(output, buf.Bytes(), 0644)
-				}
-				fmt.Print(buf.String())
+				result = buf.String()
 
 			case "md":
 				var builder strings.Builder
+				builder.WriteString("# " + info.Name() + "\n")
 				if err := printMarkdownTree(path, "", excludeList, &builder); err != nil {
 					return err
 				}
-				if output != "" {
-					return os.WriteFile(output, []byte(builder.String()), 0644)
-				}
-				fmt.Print(builder.String())
+				result = builder.String()
 
 			default:
 				return fmt.Errorf("unknown format: %s", format)
+			}
+
+			if output != "" {
+				if err := os.WriteFile(output, []byte(result), 0644); err != nil {
+					return err
+				}
+				fmt.Printf("Tree saved to %s\n", output)
+			} else if !copyToClipboard {
+				fmt.Print(result)
+			}
+			if copyToClipboard {
+				if err := utils.CopyToClipboard(result); err != nil {
+					return err
+				}
+				fmt.Println("\n(Content copied to clipboard)")
 			}
 
 			return nil
 		},
 	}
 
-	// Flags
 	cmd.Flags().StringVarP(&output, "output", "o", "", "Output file to save the tree")
 	cmd.Flags().StringSliceVarP(&exclude, "exclude", "x", []string{}, "Comma-separated list of folders/files/extensions to exclude")
 	cmd.Flags().BoolP("generate-ignore", "g", false, "Generate a default .cmdrignore file")
 	cmd.Flags().StringVarP(&format, "format", "f", "ascii", "Output format: ascii|json|csv|md")
+	cmd.Flags().BoolVarP(&copyToClipboard, "copy", "c", false, "Copy output to clipboard")
 
 	return cmd
 }
 
-// Node represents a file/directory for JSON
 type Node struct {
 	Name     string `json:"name"`
-	Type     string `json:"type"` // "file" or "dir"
+	Type     string `json:"type"`
 	Children []Node `json:"children,omitempty"`
 }
 
-// buildJSONTree builds a JSON tree structure
 func buildJSONTree(path string, excludeList []string) (Node, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -135,7 +147,6 @@ func buildJSONTree(path string, excludeList []string) (Node, error) {
 	return node, nil
 }
 
-// buildCSVTree generates CSV records recursively
 func buildCSVTree(path, prefix string, excludeList []string, records *[][]string) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -157,7 +168,6 @@ func buildCSVTree(path, prefix string, excludeList []string, records *[][]string
 	return nil
 }
 
-// printMarkdownTree generates Markdown formatted tree
 func printMarkdownTree(path, prefix string, excludeList []string, builder *strings.Builder) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -175,25 +185,29 @@ func printMarkdownTree(path, prefix string, excludeList []string, builder *strin
 	return nil
 }
 
-// printTree generates ASCII tree
 func printTree(path, prefix string, excludeList []string, builder *strings.Builder) error {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return err
 	}
-	for i, entry := range entries {
-		if utils.ShouldExclude(entry.Name(), excludeList) {
-			continue
+
+	var filtered []os.DirEntry
+	for _, entry := range entries {
+		if !utils.ShouldExclude(entry.Name(), excludeList) {
+			filtered = append(filtered, entry)
 		}
+	}
+
+	for i, entry := range filtered {
 		connector := "├── "
-		if i == len(entries)-1 {
+		if i == len(filtered)-1 {
 			connector = "└── "
 		}
 		fmt.Fprintf(builder, "%s%s%s\n", prefix, connector, entry.Name())
 
 		if entry.IsDir() {
 			newPrefix := prefix
-			if i == len(entries)-1 {
+			if i == len(filtered)-1 {
 				newPrefix += "    "
 			} else {
 				newPrefix += "│   "
