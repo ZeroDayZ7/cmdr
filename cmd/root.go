@@ -40,9 +40,10 @@ func init() {
 		tools.NewCleanCmd(),          // clean
 		tools.NewCreateServiceCmd(),  // create-service
 		tools.NewRemoveCommentsCmd(), // remove-comments
-		system.NewChecksumCmd(),      // checksum
-		system.NewKillPortCmd(),      // killport
-		system.NewKillProcessCmd(),   // killprocess
+		tools.NewAnnotateCmd(),
+		system.NewChecksumCmd(),    // checksum
+		system.NewKillPortCmd(),    // killport
+		system.NewKillProcessCmd(), // killprocess
 
 	)
 }
