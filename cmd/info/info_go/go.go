@@ -53,7 +53,7 @@ Examples:
 				runTemplate(projectName, targetDir)
 				return
 			}
-			cmd.Help()
+			_ = cmd.Help()
 		},
 	}
 

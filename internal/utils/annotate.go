@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -109,13 +110,7 @@ func ShouldIgnoreDir(name string) bool {
 	}
 
 	customIgnore, _ := ReadIgnoreFile(".annotateignore")
-	for _, item := range customIgnore {
-		if item == name {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(customIgnore, name)
 }
 
 func findProjectRoot(startPath string) (string, error) {

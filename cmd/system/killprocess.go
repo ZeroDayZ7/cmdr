@@ -22,11 +22,17 @@ func NewKillProcessCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				fmt.Print("Enter process name: ")
-				fmt.Scanln(&name)
+				if _, err := fmt.Scanln(&name); err != nil {
+					return fmt.Errorf("failed to read input: %w", err)
+				}
 			}
 
 			processes, err := utils.GetProcessesByName(name)
-			if err != nil || len(processes) == 0 {
+			if err != nil {
+				return fmt.Errorf("failed to get processes: %w", err)
+			}
+
+			if len(processes) == 0 {
 				fmt.Printf("No process found matching '%s'\n", name)
 				return nil
 			}
@@ -35,6 +41,7 @@ func NewKillProcessCmd() *cobra.Command {
 				fmt.Printf("Found process: %s (PID=%s)\n", p.Name, p.PID)
 				if force || utils.AskConfirmation("Do you want to terminate this process?") {
 					utils.TerminateProcess(p.PID, runtime.GOOS)
+					fmt.Printf("Process %s terminated.\n", p.PID)
 				} else {
 					fmt.Println("Process left running.")
 				}

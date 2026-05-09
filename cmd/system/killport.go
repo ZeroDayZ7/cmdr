@@ -22,7 +22,9 @@ func NewKillPortCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if port == 0 {
 				fmt.Print("Enter port: ")
-				fmt.Scanln(&port)
+				if _, err := fmt.Scanln(&port); err != nil {
+					return fmt.Errorf("invalid port input: %w", err)
+				}
 			}
 
 			pid, err := utils.GetPIDByPort(port)

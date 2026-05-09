@@ -63,8 +63,10 @@ func NewFilesCombineCmd() *cobra.Command {
 			defer file.Close()
 
 			writer := bufio.NewWriter(file)
-			for range [4]struct{}{} {
-				writer.WriteString("\n")
+			for range 4 {
+				if _, err := writer.WriteString("\n"); err != nil {
+					return err
+				}
 			}
 
 			err = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
@@ -87,9 +89,14 @@ func NewFilesCombineCmd() *cobra.Command {
 
 					content, readErr := os.ReadFile(path)
 					if readErr == nil {
-						writer.Write(content)
+						if _, err := writer.Write(content); err != nil {
+							return err
+						}
 					}
-					writer.WriteString("\n\n")
+
+					if _, err := writer.WriteString("\n\n"); err != nil {
+						return err
+					}
 				}
 				return nil
 			})

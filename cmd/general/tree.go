@@ -77,8 +77,9 @@ func NewTreeCmd() *cobra.Command {
 				}
 				var buf bytes.Buffer
 				w := csv.NewWriter(&buf)
-				w.WriteAll(records)
-				w.Flush()
+				if err := w.WriteAll(records); err != nil {
+					return fmt.Errorf("failed to write CSV: %w", err)
+				}
 				result = buf.String()
 
 			case "md":
@@ -162,7 +163,9 @@ func buildCSVTree(path, prefix string, excludeList []string, records *[][]string
 		}
 		*records = append(*records, row)
 		if entry.IsDir() {
-			buildCSVTree(filepath.Join(path, entry.Name()), filepath.Join(prefix, entry.Name()), excludeList, records)
+			if err := buildCSVTree(filepath.Join(path, entry.Name()), filepath.Join(prefix, entry.Name()), excludeList, records); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -179,7 +182,9 @@ func printMarkdownTree(path, prefix string, excludeList []string, builder *strin
 		}
 		fmt.Fprintf(builder, "%s- %s\n", prefix, entry.Name())
 		if entry.IsDir() {
-			printMarkdownTree(filepath.Join(path, entry.Name()), prefix+"  ", excludeList, builder)
+			if err := printMarkdownTree(filepath.Join(path, entry.Name()), prefix+"  ", excludeList, builder); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -212,7 +217,9 @@ func printTree(path, prefix string, excludeList []string, builder *strings.Build
 			} else {
 				newPrefix += "│   "
 			}
-			printTree(filepath.Join(path, entry.Name()), newPrefix, excludeList, builder)
+			if err := printTree(filepath.Join(path, entry.Name()), newPrefix, excludeList, builder); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
