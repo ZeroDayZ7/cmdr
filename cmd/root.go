@@ -21,6 +21,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// #region Execute
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -28,22 +29,24 @@ func Execute() {
 	}
 }
 
+// #region init
 func init() {
 	rootCmd.AddCommand(
-		crypto.NewCmd(),              // crypto
-		general.NewHelloCmd(),        // hello
-		info.NewInfoCmd(),            // info
-		general.NewVersionCmd(),      // version
-		general.NewTreeCmd(),         // tree
-		general.NewAskCmd(),          // ask
-		tools.NewFilesCombineCmd(),   // files-combine
-		tools.NewCleanCmd(),          // clean
-		tools.NewCreateServiceCmd(),  // create-service
-		tools.NewRemoveCommentsCmd(), // remove-comments
-		tools.NewAnnotateCmd(),
-		system.NewChecksumCmd(),    // checksum
-		system.NewKillPortCmd(),    // killport
-		system.NewKillProcessCmd(), // killprocess
+		crypto.NewCmd(),               // crypto
+		general.NewHelloCmd(),         // hello
+		info.NewInfoCmd(),             // info
+		general.NewVersionCmd(),       // version
+		general.NewTreeCmd(),          // tree
+		general.NewAskCmd(),           // ask
+		tools.NewFilesCombineCmd(),    // files-combine
+		tools.NewCleanCmd(),           // clean
+		tools.NewCreateServiceCmd(),   // create-service
+		tools.NewRemoveCommentsCmd(),  // remove-comments
+		tools.NewAnnotateRegionsCmd(), // annotate-regions / reg
+		tools.NewAnnotateCmd(),        // adnotacje
+		system.NewChecksumCmd(),       // checksum
+		system.NewKillPortCmd(),       // killport
+		system.NewKillProcessCmd(),    // killprocess
 
 	)
 }

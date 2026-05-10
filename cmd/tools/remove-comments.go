@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/spf13/cobra"
+	"github.com/zerodayz7/cmdr/internal/utils"
 )
 
 var (
@@ -15,16 +16,13 @@ var (
 )
 
 // #region RemoveCommentsCmd
-// Removes comments from a file or all files in a directory.
 func NewRemoveCommentsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove-comments",
 		Aliases: []string{"rmc", "clean-comments"},
 		Short:   "Remove comments from a specific file or all files in a directory",
-		Long: `This command removes comments from the given file (any extension) or all files in a directory (any extension).
-Example:
-  cmdr remove-comments -f wikiData.tsx
-  cmdr remove-comments -d ./my-folder`,
+		Long: `This command removes comments from the given file or all files in a directory.
+It uses a dedicated ignore file: .cmdr_rmc_ignore located in the executable directory.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if directory != "" {
 				if err := removeCommentsFromDir(directory); err != nil {
@@ -79,9 +77,43 @@ func removeComments(content string) string {
 
 // #region removeCommentsFromDir
 func removeCommentsFromDir(directory string) error {
-	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+	ignoreFileName := ".cmdr_rmc_ignore"
+
+	// 1. Próbujemy wczytać plik
+	ignoreList, err := utils.ReadIgnoreFile(ignoreFileName)
+
+	// 2. Jeśli plik nie istnieje (ignoreList jest nil), generujemy go automatycznie
+	if ignoreList == nil {
+		// Definiujemy sensowne domyślne wzorce dla usuwania komentarzy
+		defaults := []string{
+			".g.dart",
+			".git",
+			"node_modules",
+			"bin",
+			"vendor",
+		}
+
+		err = utils.GenerateFileWithDefaults(ignoreFileName, defaults)
+		if err != nil {
+			fmt.Printf("Warning: Could not create default ignore file: %v\n", err)
+		} else {
+			// Po wygenerowaniu, wczytujemy go ponownie, aby mieć listę
+			ignoreList, _ = utils.ReadIgnoreFile(ignoreFileName)
+		}
+	}
+
+	// 3. Dalej idzie standardowy Walk
+	err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		// Sprawdzanie wykluczeń z użyciem Twojego utils.ShouldExclude
+		if utils.ShouldExclude(info.Name(), ignoreList) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		if !info.IsDir() {
@@ -92,10 +124,5 @@ func removeCommentsFromDir(directory string) error {
 		return nil
 	})
 
-	if err != nil {
-		return fmt.Errorf("failed to process directory %s: %v", directory, err)
-	}
-
-	fmt.Printf("Comments removed from all files in the directory: %s\n", directory)
-	return nil
+	return err
 }

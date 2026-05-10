@@ -1,14 +1,13 @@
 package utils
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-// #region GenerateFileWithDefaults
-// Generates a file with default ignore values. Defaults to ".cmdrignore".
 func GenerateFileWithDefaults(filename string, defaults []string) error {
 	if filename == "" {
 		filename = ".cmdrignore"
@@ -43,14 +42,19 @@ func GenerateFileWithDefaults(filename string, defaults []string) error {
 	exeDir := filepath.Dir(exePath)
 
 	filePath := filepath.Join(exeDir, filename)
-	if err := os.WriteFile(filePath, []byte(content), 0644); err == nil {
-		fmt.Printf("Generated %s at %s with default values.\n", filename, exeDir)
+
+	if _, err := os.Stat(filePath); err == nil {
+		return nil
 	}
-	return err
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %v", filename, err)
+	}
+
+	fmt.Printf("Generated %s at %s with default values.\n", filename, exeDir)
+	return nil
 }
 
-// #region ReadIgnoreFile
-// Reads an ignore file and returns its content as a list of non-empty trimmed lines.
 func ReadIgnoreFile(filename string) ([]string, error) {
 	if filename == "" {
 		filename = ".cmdrignore"
@@ -61,24 +65,30 @@ func ReadIgnoreFile(filename string) ([]string, error) {
 		return nil, fmt.Errorf("failed to get executable path: %v", err)
 	}
 	exeDir := filepath.Dir(exePath)
-
 	filePath := filepath.Join(exeDir, filename)
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return nil, nil
-	}
 
-	data, err := os.ReadFile(filePath)
+	file, err := os.Open(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
+	defer file.Close()
 
-	lines := strings.Split(string(data), "\n")
 	var result []string
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-		if l != "" {
-			result = append(result, l)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		if line != "" && !strings.HasPrefix(line, "#") {
+			result = append(result, line)
 		}
 	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading ignore file: %v", err)
+	}
+
 	return result, nil
 }
