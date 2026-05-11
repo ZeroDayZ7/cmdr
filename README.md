@@ -2,22 +2,20 @@
 
 A fast, developer-friendly CLI for bootstrapping microservices and handy Go tools.
 
+## Table of Contents
+<!-- * [Features](#features) -->
+<!-- * [Usage](#usage) -->
+<!-- * [Configuration](#configuration-file) -->
+* [Project Profiles (Smart Detection)](./docs/PROFILES_GUIDE.md)
+<!-- * [Available Commands](#other-available-commands) -->
+<!-- * [Flags](#flags) -->
+
 ## Features
 
 * Scaffold microservices in seconds
 * Generate boilerplate for Go projects
 * Handy developer utilities
 * Custom templates for your services
-
-## Clone
-
-Clone and build manually:
-
-```bash
-git clone https://github.com/ZeroDayZ7/cmdr.git
-cd cmdr
-go build -o bin/cmdr.exe
-```
 
 ## Usage
 

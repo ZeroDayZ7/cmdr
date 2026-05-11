@@ -7,68 +7,65 @@ import (
 	"regexp"
 
 	"github.com/spf13/cobra"
-	"github.com/zerodayz7/cmdr/internal/utils"
+	"github.com/zerodayz7/cmdr/internal/profiles"
 )
 
 var (
-	file      string
-	directory string
+	removeFile string
+	removeDir  string
 )
 
-// #region RemoveCommentsCmd
+// #region NewRemoveCommentsCmd
 func NewRemoveCommentsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove-comments",
 		Aliases: []string{"rmc", "clean-comments"},
-		Short:   "Remove comments from a specific file or all files in a directory",
-		Long: `This command removes comments from the given file or all files in a directory.
-It uses a dedicated ignore file: .cmdr_rmc_ignore located in the executable directory.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			if directory != "" {
-				if err := removeCommentsFromDir(directory); err != nil {
-					fmt.Println("Error:", err)
-				}
-				return
-			}
-			if file != "" {
-				if err := removeCommentsFromFile(file); err != nil {
-					fmt.Println("Error:", err)
-				}
-				return
-			}
-			fmt.Println("Please provide a file (-f) or a directory (-d) to remove comments.")
-		},
+		Short:   "Remove comments based on project profile",
+		RunE:    runRemoveComments,
 	}
 
-	cmd.Flags().StringVarP(&file, "file", "f", "", "Path to the file from which comments should be removed")
-	cmd.Flags().StringVarP(&directory, "directory", "d", "", "Path to the folder from which comments should be removed")
+	cmd.Flags().StringVarP(&removeFile, "file", "f", "", "Path to specific file")
+	cmd.Flags().StringVarP(&removeDir, "directory", "d", "", "Path to directory")
 	return cmd
+}
+
+// #region runRemoveComments
+func runRemoveComments(cmd *cobra.Command, args []string) error {
+	if removeFile != "" {
+		return removeCommentsFromFile(removeFile)
+	}
+
+	targetDir := removeDir
+	if targetDir == "" {
+		targetDir = "."
+	}
+
+	return removeCommentsFromDir(targetDir)
 }
 
 // #region removeCommentsFromFile
 func removeCommentsFromFile(filePath string) error {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read file %s: %v", filePath, err)
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
 	cleanedContent := removeComments(string(content))
 
 	if err := os.WriteFile(filePath, []byte(cleanedContent), 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %v", filePath, err)
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
 
-	fmt.Printf("Comments removed from the file: %s\n", filePath)
+	fmt.Printf("✨ Cleaned: %s\n", filePath)
 	return nil
 }
 
 // #region removeComments
 func removeComments(content string) string {
-	// Remove multi-line comments
+
 	multiLineRegex := regexp.MustCompile(`(?s)/\*.*?\*/`)
 	cleaned := multiLineRegex.ReplaceAllString(content, "")
 
-	// Remove single-line comments, preserving those in URLs
 	singleLineRegex := regexp.MustCompile(`(?m)(^|\s+)//.*$`)
 	cleaned = singleLineRegex.ReplaceAllString(cleaned, "$1")
 
@@ -77,52 +74,56 @@ func removeComments(content string) string {
 
 // #region removeCommentsFromDir
 func removeCommentsFromDir(directory string) error {
-	ignoreFileName := ".cmdr_rmc_ignore"
 
-	// 1. Próbujemy wczytać plik
-	ignoreList, err := utils.ReadIgnoreFile(ignoreFileName)
-
-	// 2. Jeśli plik nie istnieje (ignoreList jest nil), generujemy go automatycznie
-	if ignoreList == nil {
-		// Definiujemy sensowne domyślne wzorce dla usuwania komentarzy
-		defaults := []string{
-			".g.dart",
-			".git",
-			"node_modules",
-			"bin",
-			"vendor",
-		}
-
-		err = utils.GenerateFileWithDefaults(ignoreFileName, defaults)
-		if err != nil {
-			fmt.Printf("Warning: Could not create default ignore file: %v\n", err)
-		} else {
-			// Po wygenerowaniu, wczytujemy go ponownie, aby mieć listę
-			ignoreList, _ = utils.ReadIgnoreFile(ignoreFileName)
-		}
+	cfg, err := profiles.LoadConfig()
+	if err != nil {
+		return err
 	}
 
-	// 3. Dalej idzie standardowy Walk
-	err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+	activeProfile := profiles.DetectProjectProfile(directory, cfg)
+
+	ignoredItems := cfg.Global.Ignore
+	if activeProfile != nil {
+		ignoredItems = append(ignoredItems, activeProfile.Ignore...)
+		fmt.Printf("🚀 Using profile: %s for comment removal\n", activeProfile.Name)
+	}
+
+	return filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Sprawdzanie wykluczeń z użyciem Twojego utils.ShouldExclude
-		if utils.ShouldExclude(info.Name(), ignoreList) {
-			if info.IsDir() {
-				return filepath.SkipDir
+		name := info.Name()
+
+		for _, ignored := range ignoredItems {
+			if name == ignored {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
 			}
-			return nil
 		}
 
 		if !info.IsDir() {
-			if err := removeCommentsFromFile(path); err != nil {
-				return err
+
+			ext := filepath.Ext(name)
+			if isSupportedExtension(ext) {
+				if err := removeCommentsFromFile(path); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not clean %s: %v\n", path, err)
+				}
 			}
 		}
 		return nil
 	})
+}
 
-	return err
+// #region isSupportedExtension
+func isSupportedExtension(ext string) bool {
+	supported := []string{".go", ".dart", ".ts", ".js", ".tsx", ".jsx", ".c", ".cpp", ".java"}
+	for _, s := range supported {
+		if s == ext {
+			return true
+		}
+	}
+	return false
 }
