@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"github.com/zerodayz7/cmdr/internal/profiles"
@@ -120,10 +121,5 @@ func removeCommentsFromDir(directory string) error {
 // #region isSupportedExtension
 func isSupportedExtension(ext string) bool {
 	supported := []string{".go", ".dart", ".ts", ".js", ".tsx", ".jsx", ".c", ".cpp", ".java"}
-	for _, s := range supported {
-		if s == ext {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(supported, ext)
 }
