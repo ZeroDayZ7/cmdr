@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -114,12 +115,7 @@ func prepareIgnored(cfg *profiles.Config, p *profiles.Profile) []string {
 
 // #region isIgnored
 func isIgnored(name string, ignoredList []string) bool {
-	for _, ignored := range ignoredList {
-		if name == ignored {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ignoredList, name)
 }
 
 // #region isAllowed

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// #region NewCleanCmd
 func NewCleanCmd() *cobra.Command {
 	var dirName string
 

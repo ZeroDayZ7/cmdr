@@ -44,6 +44,7 @@
     "android": true,
     "cnc_toolbox.iml": true,
     "raw_assets/": true
+    // "combined.txt": true
   },
 
   // (Search)
@@ -78,7 +79,8 @@
     "**/*.g.dart": true,
     "**/*.txt": true,
     "cnc_toolbox.iml": true,
-    "raw_assets/": true
+    "raw_assets/": true,
+    "combined.txt": true
   },
   "search.useIgnoreFiles": true,
   "search.useGlobalIgnoreFiles": true,

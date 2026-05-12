@@ -20,6 +20,8 @@ type Profile struct {
 }
 
 type Config struct {
-	Global   GlobalConfig `json:"global"`
-	Profiles []Profile    `json:"profiles"`
+	Global        GlobalConfig      `json:"global"`
+	Profiles      []Profile         `json:"profiles"`
+	CommentStyles map[string]string `json:"comment_styles"`
+	IgnoredExts   []string          `json:"ignored_exts"`
 }

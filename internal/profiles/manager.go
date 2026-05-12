@@ -8,7 +8,10 @@ import (
 )
 
 func LoadConfig() (*Config, error) {
-	configPath := GetConfigPath()
+	configPath, err := GetConfigPath()
+	if err != nil {
+		return nil, err
+	}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return initDefaultConfig()
@@ -32,7 +35,10 @@ func LoadConfig() (*Config, error) {
 }
 
 func initDefaultConfig() (*Config, error) {
-	configPath := GetConfigPath()
+	configPath, err := GetConfigPath()
+	if err != nil {
+		return nil, err
+	}
 
 	if err := os.WriteFile(configPath, []byte(DefaultProfilesConfig), 0644); err != nil {
 		return nil, fmt.Errorf("failed to create default config at %s: %w", configPath, err)
