@@ -12,9 +12,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/zerodayz7/cmdr/internal/logger"
 )
 
-func NewChecksumCmd() *cobra.Command {
+func NewChecksumCmd(l logger.Logger) *cobra.Command {
 	var autoOutput bool
 	var outputFile string
 	var algo string
@@ -27,22 +28,21 @@ func NewChecksumCmd() *cobra.Command {
 Examples:
   cmdr checksum example.txt          # prints checksum to console
   cmdr checksum example.txt -o       # auto-generate file example.sha256
-  cmdr checksum example.txt -o -a sha512 # auto-generate file example.sha512
-  cmdr checksum example.txt -f mysum.txt # custom output file
-  cmdr checksum example.txt -a md5
+  cmdr checksum example.txt -f out.txt # custom output file
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filePath := args[0]
+			ctx := cmd.Context()
 
-			// otwieranie pliku do hashowania
+			l.Debug("Starting checksum calculation", "file", filePath, "algo", algo)
+
 			file, err := os.Open(filePath)
 			if err != nil {
 				return fmt.Errorf("error opening file %s: %w", filePath, err)
 			}
 			defer file.Close()
 
-			// wybór algorytmu
 			var hasher hash.Hash
 			switch strings.ToLower(algo) {
 			case "sha256", "":
@@ -55,13 +55,24 @@ Examples:
 				return fmt.Errorf("unsupported algorithm: %s", algo)
 			}
 
-			if _, err := io.Copy(hasher, file); err != nil {
-				return fmt.Errorf("error reading file %s: %w", filePath, err)
+			errChan := make(chan error, 1)
+			go func() {
+				_, err := io.Copy(hasher, file)
+				errChan <- err
+			}()
+
+			select {
+			case <-ctx.Done():
+				l.Error("Operation cancelled by user")
+				return ctx.Err()
+			case err := <-errChan:
+				if err != nil {
+					return fmt.Errorf("error reading file %s: %w", filePath, err)
+				}
 			}
 
 			checksum := fmt.Sprintf("%x", hasher.Sum(nil))
 
-			// ustalanie pliku wyjściowego
 			outPath := ""
 			if outputFile != "" {
 				outPath = outputFile
@@ -80,16 +91,15 @@ Examples:
 				if err := os.WriteFile(outPath, []byte(checksum+"\n"), 0644); err != nil {
 					return fmt.Errorf("error writing to file %s: %w", outPath, err)
 				}
-				fmt.Printf("✅ Checksum saved to %s\n", outPath)
+				l.Success("Checksum saved to %s", outPath)
 			} else {
-				fmt.Printf("%s  %s\n", checksum, filePath)
+				l.Success("%s  %s", checksum, filePath)
 			}
 
 			return nil
 		},
 	}
 
-	// flagi
 	cmd.Flags().BoolVarP(&autoOutput, "output", "o", false, "Generate checksum file automatically")
 	cmd.Flags().StringVarP(&outputFile, "file", "f", "", "Custom output filename")
 	cmd.Flags().StringVarP(&algo, "algo", "a", "sha256", "Algorithm: sha256|sha512|md5")

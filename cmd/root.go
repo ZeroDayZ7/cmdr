@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -22,14 +21,14 @@ var rootCmd = &cobra.Command{
 	Short: "cmdr is a developer helper tool",
 	Long:  `cmdr helps you run tasks like migrate, dev server, etc.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Welcome to cmdr! Use -h to see available commands.")
+		l.Info("Welcome to cmdr! Use -h to see available commands.")
 	},
 }
 
 // #region Execute
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		l.Error("Critical failure: %v", err)
 		os.Exit(1)
 	}
 }
@@ -49,7 +48,7 @@ func init() {
 		tools.NewRemoveCommentsCmd(),  // remove-comments
 		tools.NewAnnotateRegionsCmd(), // annotate-regions / reg
 		tools.NewAnnotateCmd(),        // adnotacje
-		system.NewChecksumCmd(),       // checksum
+		system.NewChecksumCmd(l),      // checksum
 		system.NewKillPortCmd(),       // killport
 		system.NewKillProcessCmd(),    // killprocess
 
