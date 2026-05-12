@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 	annotate "github.com/zerodayz7/cmdr/internal/annotate_origin"
+	"github.com/zerodayz7/cmdr/internal/logger"
 	"github.com/zerodayz7/cmdr/internal/profiles"
-	"github.com/zerodayz7/cmdr/internal/ui"
 )
 
 func NewAnnotateCmd() *cobra.Command {
@@ -42,7 +42,7 @@ func NewAnnotateCmd() *cobra.Command {
 				}
 			}
 
-			logger := &ui.ConsoleLogger{IsVerbose: verbose}
+			logger := &logger.ConsoleLogger{IsVerbose: verbose}
 
 			cfg := annotate.Config{
 				DryRun:         dryRun,

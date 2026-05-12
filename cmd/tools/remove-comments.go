@@ -86,7 +86,7 @@ func removeCommentsFromDir(directory string) error {
 	ignoredItems := cfg.Global.Ignore
 	if activeProfile != nil {
 		ignoredItems = append(ignoredItems, activeProfile.Ignore...)
-		fmt.Printf("🚀 Using profile: %s for comment removal\n", activeProfile.Name)
+		fmt.Printf("Using profile: %s for comment removal\n", activeProfile.Name)
 	}
 
 	return filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {

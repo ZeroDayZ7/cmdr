@@ -50,7 +50,7 @@ func runFilesCombine(cmd *cobra.Command, args []string) error {
 	ignoredItems := prepareIgnored(cfg, activeProfile)
 
 	if activeProfile != nil {
-		fmt.Printf("🚀 Detected profile: %s\n", activeProfile.Name)
+		fmt.Printf("Detected profile: %s\n", activeProfile.Name)
 	}
 
 	file, err := os.Create(outputFile)
