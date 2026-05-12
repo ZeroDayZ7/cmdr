@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	annotate "github.com/zerodayz7/cmdr/internal/annotate_origin"
 	"github.com/zerodayz7/cmdr/internal/profiles"
+	"github.com/zerodayz7/cmdr/internal/ui"
 )
 
 func NewAnnotateCmd() *cobra.Command {
@@ -41,30 +42,56 @@ func NewAnnotateCmd() *cobra.Command {
 				}
 			}
 
+			logger := &ui.ConsoleLogger{IsVerbose: verbose}
+
 			cfg := annotate.Config{
 				DryRun:         dryRun,
 				Verbose:        verbose,
 				Profile:        activeProfile,
 				ProfilesConfig: profilesConfig,
+				Log:            logger,
 			}
 
-			if filePath == "" && dirPath == "" {
-				dirPath = "."
-			}
-
+			var paths []string
 			if filePath != "" {
-				return annotate.AnnotateFile(filePath, cfg)
+				paths = append(paths, filePath)
+			} else {
+				if dirPath == "" {
+					dirPath = "."
+				}
+				err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
+					if !info.IsDir() {
+						paths = append(paths, path)
+					}
+					return nil
+				})
+				if err != nil {
+					return fmt.Errorf("error walking path: %w", err)
+				}
 			}
 
-			return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
+			if verbose {
+				logger.Info("Starting annotation process for %d files...", len(paths))
+			}
+
+			results := annotate.ProcessBatch(cmd.Context(), paths, cfg)
+
+			var errCount int
+			for _, res := range results {
+				if res.Err != nil {
+					errCount++
+					logger.Error("%s: %v", res.Path, res.Err)
 				}
-				if info.IsDir() {
-					return nil
-				}
-				return annotate.AnnotateFile(path, cfg)
-			})
+			}
+
+			if verbose {
+				fmt.Printf("\nFinished: %d tasks, %d errors\n", len(results), errCount)
+			}
+
+			return nil
 		},
 	}
 

@@ -36,15 +36,12 @@ func AnnotateFile(path string, cfg Config) error {
 	content := string(contentBytes)
 
 	if HasAnnotation(content) {
-		if cfg.Verbose {
-			fmt.Printf("[SKIP] %s\n", path)
-		}
+		cfg.Log.Debug("Skipping %s: annotation already exists", path)
 		return nil
 	}
 
 	root, err := FindProjectRoot(path, cfg)
 	if err != nil {
-
 		root = filepath.Dir(path)
 	}
 
@@ -54,20 +51,32 @@ func AnnotateFile(path string, cfg Config) error {
 	}
 
 	comment := fmt.Sprintf(style, relPath)
-
 	newContent := injectComment(content, comment)
 
 	if cfg.DryRun {
-		fmt.Printf("[ADD] %s\n", path)
+		cfg.Log.Info("[DRY-RUN] Would annotate: %s", path)
 		return nil
 	}
 
-	if err := os.WriteFile(path, []byte(newContent), 0644); err != nil {
-		return fmt.Errorf("write error: %w", err)
+	if err := atomicWrite(path, []byte(newContent)); err != nil {
+		return fmt.Errorf("atomic write error: %w", err)
 	}
 
-	if cfg.Verbose {
-		fmt.Printf("[OK] %s\n", path)
+	cfg.Log.Success("%s", path)
+
+	return nil
+}
+
+func atomicWrite(path string, data []byte) error {
+	tmpPath := path + ".tmp." + fmt.Sprint(os.Getpid())
+
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return err
 	}
 
 	return nil

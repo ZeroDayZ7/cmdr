@@ -1,6 +1,9 @@
 package annotate
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/zerodayz7/cmdr/internal/profiles"
@@ -86,4 +89,53 @@ func TestIsAllowedExtension(t *testing.T) {
 			t.Error("Expected .dart to be allowed by profile")
 		}
 	})
+}
+
+func TestAtomicWrite(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "atomic.txt")
+	data := []byte("hello atomic")
+
+	// Test podstawowego zapisu
+	if err := atomicWrite(filePath, data); err != nil {
+		t.Fatalf("atomicWrite failed: %v", err)
+	}
+
+	got, _ := os.ReadFile(filePath)
+	if string(got) != string(data) {
+		t.Errorf("got %s, want %s", string(got), string(data))
+	}
+
+	// Sprawdzenie czy nie ma plików .tmp
+	files, _ := os.ReadDir(tempDir)
+	for _, f := range files {
+		if strings.Contains(f.Name(), ".tmp") {
+			t.Errorf("Temporary file leaked: %s", f.Name())
+		}
+	}
+}
+
+func TestAnnotateFile_Integration(t *testing.T) {
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "main.go")
+	os.WriteFile(path, []byte("package main"), 0644)
+
+	cfg := Config{
+		ProfilesConfig: &profiles.Config{
+			CommentStyles: map[string]string{".go": "// %s"},
+		},
+	}
+
+	err := AnnotateFile(path, cfg)
+	if err != nil {
+		t.Fatalf("AnnotateFile failed: %v", err)
+	}
+
+	content, _ := os.ReadFile(path)
+	if !strings.HasPrefix(string(content), "//") {
+		t.Error("File was not annotated")
+	}
+	if !strings.Contains(string(content), "main.go") {
+		t.Error("Annotation does not contain filename")
+	}
 }
