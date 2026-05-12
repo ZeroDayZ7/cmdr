@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -40,6 +41,11 @@ func initDefaultConfig() (*Config, error) {
 		return nil, err
 	}
 
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create config directory %s: %w", configDir, err)
+	}
+
 	if err := os.WriteFile(configPath, []byte(DefaultProfilesConfig), 0644); err != nil {
 		return nil, fmt.Errorf("failed to create default config at %s: %w", configPath, err)
 	}
@@ -47,6 +53,8 @@ func initDefaultConfig() (*Config, error) {
 	fmt.Printf("⚙️  Initialized default profiles at: %s\n", configPath)
 
 	var cfg Config
-	_ = json.Unmarshal([]byte(DefaultProfilesConfig), &cfg)
+	if err := json.Unmarshal([]byte(DefaultProfilesConfig), &cfg); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
 }
