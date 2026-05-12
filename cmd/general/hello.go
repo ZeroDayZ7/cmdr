@@ -1,19 +1,20 @@
 package general
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/zerodayz7/cmdr/internal/logger"
 )
 
-// NewHelloCmd tworzy podkomendę hello
-func NewHelloCmd() *cobra.Command {
+func NewHelloCmd(l logger.Logger) *cobra.Command {
 	return &cobra.Command{
 		Use:   "hello",
 		Short: "Say hello",
 		Long:  `This command is used to test write out a greeting in the CLI.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("Hello from CLI! 🚀")
+			l.Success("Hello from cmdr! System is operational.")
+
+			// -v
+			l.Debug("Hello command executed successfully")
 		},
 	}
 }

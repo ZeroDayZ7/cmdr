@@ -10,7 +10,12 @@ import (
 	"github.com/zerodayz7/cmdr/cmd/info"
 	"github.com/zerodayz7/cmdr/cmd/system"
 	"github.com/zerodayz7/cmdr/cmd/tools"
+	"github.com/zerodayz7/cmdr/internal/logger"
 )
+
+var l = &logger.ConsoleLogger{
+	IsVerbose: false,
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "cmdr",
@@ -33,9 +38,9 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(
 		crypto.NewCmd(),               // crypto
-		general.NewHelloCmd(),         // hello
+		general.NewHelloCmd(l),        // hello
 		info.NewInfoCmd(),             // info
-		general.NewVersionCmd(),       // version
+		general.NewVersionCmd(l),      // version
 		general.NewTreeCmd(),          // tree
 		general.NewAskCmd(),           // ask
 		tools.NewFilesCombineCmd(),    // files-combine

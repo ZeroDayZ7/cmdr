@@ -1,14 +1,14 @@
 package tools
 
 import (
-	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
-// #region NewCleanCmd
 func NewCleanCmd() *cobra.Command {
 	var dirName string
 
@@ -20,31 +20,37 @@ func NewCleanCmd() *cobra.Command {
 Deletes all directories named "logs" in the current directory and subdirectories.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if dirName == "" {
-				fmt.Println("Please provide a directory name to delete using the -d flag")
+				slog.Warn("No directory name provided. Use -d flag.")
 				return
 			}
 
-			fmt.Printf("Cleaning all '%s' folders in the project...\n", dirName)
+			slog.Info("Cleaning folders", "target", dirName)
 
-			err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+			err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
+					slog.Error("Error accessing path", "path", path, "error", err)
 					return err
 				}
-				if info.IsDir() && info.Name() == dirName {
-					fmt.Printf("Deleting: %s\n", path)
+
+				if d.IsDir() && d.Name() == dirName {
+					slog.Info("Deleting directory", "path", path)
+
 					if rmErr := os.RemoveAll(path); rmErr != nil {
-						fmt.Printf("Error deleting %s: %v\n", path, rmErr)
+						slog.Error("Failed to delete directory", "path", path, "error", rmErr)
 					}
+
+					return filepath.SkipDir
 				}
+
 				return nil
 			})
 
 			if err != nil {
-				fmt.Println("Error walking the path:", err)
-				return
+				slog.Error("Cleanup process failed", "error", err)
+				os.Exit(1)
 			}
 
-			fmt.Println("Done!")
+			slog.Info("Cleanup completed successfully")
 		},
 	}
 
