@@ -9,18 +9,22 @@ import (
 )
 
 func AnnotateFile(path string, cfg Config) error {
+
 	ext := strings.ToLower(filepath.Ext(path))
 
 	if !isAllowedExtension(ext, cfg) {
+		cfg.Log.Debug("Skipping %s: extension '%s' not allowed by current profile/settings", path, ext)
 		return nil
 	}
 
 	style, ok := cfg.ProfilesConfig.CommentStyles[ext]
 	if !ok {
+		cfg.Log.Debug("Skipping %s: no comment style defined for extension %s", path, ext)
 		return nil
 	}
 
 	if shouldIgnore(path, cfg) {
+		cfg.Log.Debug("Skipping %s: path matches ignore patterns", path)
 		return nil
 	}
 
@@ -30,6 +34,7 @@ func AnnotateFile(path string, cfg Config) error {
 	}
 
 	if IsBinary(contentBytes) {
+		cfg.Log.Debug("Skipping %s: binary file detected", path)
 		return nil
 	}
 
@@ -42,6 +47,7 @@ func AnnotateFile(path string, cfg Config) error {
 
 	root, err := FindProjectRoot(path, cfg)
 	if err != nil {
+		cfg.Log.Debug("Warning: project root not found for %s, using directory", path)
 		root = filepath.Dir(path)
 	}
 
@@ -54,7 +60,7 @@ func AnnotateFile(path string, cfg Config) error {
 	newContent := injectComment(content, comment)
 
 	if cfg.DryRun {
-		cfg.Log.Info("[DRY-RUN] Would annotate: %s", path)
+		cfg.Log.Info("[DRY-RUN] Would annotate: %s (path: %s)", path, relPath)
 		return nil
 	}
 
@@ -68,6 +74,7 @@ func AnnotateFile(path string, cfg Config) error {
 }
 
 func atomicWrite(path string, data []byte) error {
+
 	tmpPath := path + ".tmp." + fmt.Sprint(os.Getpid())
 
 	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
@@ -75,7 +82,8 @@ func atomicWrite(path string, data []byte) error {
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
+
+		_ = os.Remove(tmpPath)
 		return err
 	}
 
@@ -85,6 +93,11 @@ func atomicWrite(path string, data []byte) error {
 var shebangRegex = regexp.MustCompile(`^#!\s*/.+`)
 
 func injectComment(content, comment string) string {
+
+	if len(strings.TrimSpace(content)) == 0 {
+		return comment
+	}
+
 	lines := strings.SplitN(content, "\n", 2)
 
 	if len(lines) > 0 && shebangRegex.MatchString(lines[0]) {

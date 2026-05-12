@@ -26,14 +26,15 @@ func shouldIgnore(path string, cfg Config) bool {
 
 func isAllowedExtension(ext string, cfg Config) bool {
 	if cfg.Profile != nil && len(cfg.Profile.Extensions) > 0 {
-		for _, a := range cfg.Profile.Extensions {
-			if strings.EqualFold(a, ext) {
+		for _, e := range cfg.Profile.Extensions {
+			if strings.EqualFold(e, ext) {
 				return true
 			}
 		}
+
 		return false
 	}
 
-	_, ok := cfg.ProfilesConfig.CommentStyles[ext]
+	_, ok := cfg.ProfilesConfig.CommentStyles[strings.ToLower(ext)]
 	return ok
 }
