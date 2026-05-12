@@ -19,8 +19,8 @@ func NewAnnotateCmd() *cobra.Command {
 	var verbose bool
 
 	cmd := &cobra.Command{
-		Use:     "annotate",
-		Aliases: []string{"ant", "at"},
+		Use:     "annotate-origins",
+		Aliases: []string{"ant", "ato"},
 		Short:   "Insert project path annotations into files",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			profilesConfig, err := profiles.LoadConfig()

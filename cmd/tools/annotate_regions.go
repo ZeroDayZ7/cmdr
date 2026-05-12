@@ -20,7 +20,7 @@ var (
 func NewAnnotateRegionsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "annotate-regions",
-		Aliases: []string{"reg", "ann", "regions"},
+		Aliases: []string{"reg", "ann", "atr"},
 		Short:   "Wraps every function in a file with #region and #endregion",
 		Example: "cmdr reg -d ./internal/api\ncmdr reg -f main.go",
 		Run: func(cmd *cobra.Command, args []string) {
