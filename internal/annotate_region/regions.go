@@ -1,54 +1,70 @@
-package annotate
+package annotate_region
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/zerodayz7/cmdr/internal/profiles"
 )
 
-// Obsługuje funkcje zwykłe oraz metody na strukturach
-var funcRegex = regexp.MustCompile(`(?m)^func\s+(?:\([^\)]+\)\s+)?([a-zA-Z0-9_]+)\s*\(`)
+func AnnotateRegions(filePath string, cfg Config, profile *profiles.Profile, fullCfg *profiles.Config) (bool, error) {
+	if profile == nil || len(profile.RegionPatterns) == 0 {
+		return false, nil
+	}
 
-// Zaktualizowana sygnatura: przyjmuje Config
-func AnnotateRegions(filePath string, cfg Config) (bool, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return false, err
 	}
 
+	ext := filepath.Ext(filePath)
+	commentStyle, ok := fullCfg.CommentStyles[ext]
+	if !ok {
+		commentStyle = "// %s"
+	}
+
 	strContent := string(content)
+	currentContent := strContent
 	modified := false
 
-	newContent := funcRegex.ReplaceAllStringFunc(strContent, func(match string) string {
-		submatch := funcRegex.FindStringSubmatch(match)
-		if len(submatch) < 2 {
-			return match
+	for _, p := range profile.RegionPatterns {
+		re, err := regexp.Compile("(?m)" + p.Regex)
+		if err != nil {
+			continue
 		}
 
-		funcName := submatch[1]
-		regionTag := fmt.Sprintf("// #region %s", funcName)
+		currentContent = re.ReplaceAllStringFunc(currentContent, func(match string) string {
+			submatch := re.FindStringSubmatch(match)
+			if len(submatch) < 2 {
+				return match
+			}
 
-		if strings.Contains(strContent, regionTag) {
-			return match
-		}
+			name := submatch[1]
+			regionLabel := fmt.Sprintf("#region %s", name)
+			regionTag := fmt.Sprintf(commentStyle, regionLabel)
 
-		modified = true
-		return fmt.Sprintf("%s\n%s", regionTag, match)
-	})
+			if strings.Contains(strContent, regionTag) {
+				return match
+			}
+
+			modified = true
+			return fmt.Sprintf("%s\n%s", regionTag, match)
+		})
+	}
 
 	if modified {
-		// Logowanie verbose
 		if cfg.Verbose {
-			fmt.Printf("[ANNOTATE] Found new regions in: %s\n", filePath)
+			fmt.Printf("[ANNOTATE][%s] Found new regions in: %s\n", profile.Name, filePath)
 		}
 
-		// Respektowanie DryRun
 		if cfg.DryRun {
 			return true, nil
 		}
 
-		err = os.WriteFile(filePath, []byte(newContent), 0644)
+		err = os.WriteFile(filePath, []byte(currentContent), 0644)
 	}
 
 	return modified, err

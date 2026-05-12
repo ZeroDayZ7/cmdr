@@ -1,4 +1,4 @@
-package annotate
+package annotate_origin
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zerodayz7/cmdr/internal/annotate"
 	"github.com/zerodayz7/cmdr/internal/profiles"
 )
 
@@ -23,14 +24,12 @@ func TestIsBinary(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsBinary(tt.input); got != tt.expected {
+			if got := annotate.IsBinary(tt.input); got != tt.expected {
 				t.Errorf("IsBinary() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
 }
-
-// annotate_test.go (dopisz pod TestIsBinary)
 
 func TestInjectComment(t *testing.T) {
 	comment := "// cmdr: test/path.go"
@@ -59,7 +58,7 @@ func TestInjectComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := injectComment(tt.content, comment)
+			got := annotate.InjectComment(tt.content, comment)
 			if got != tt.expected {
 				t.Errorf("got:\n%s\nwant:\n%s", got, tt.expected)
 			}
@@ -68,24 +67,24 @@ func TestInjectComment(t *testing.T) {
 }
 
 func TestIsAllowedExtension(t *testing.T) {
-	cfg := Config{
+	cfg := annotate.Config{
 		ProfilesConfig: &profiles.Config{
 			CommentStyles: map[string]string{".go": "// %s", ".py": "# %s"},
 		},
 	}
 
 	t.Run("Global allow", func(t *testing.T) {
-		if !isAllowedExtension(".go", cfg) {
+		if !annotate.IsAllowedExtension(".go", cfg) {
 			t.Error("Expected .go to be allowed")
 		}
 	})
 
 	t.Run("Profile override", func(t *testing.T) {
 		cfg.Profile = &profiles.Profile{Extensions: []string{".dart"}}
-		if isAllowedExtension(".go", cfg) {
+		if annotate.IsAllowedExtension(".go", cfg) {
 			t.Error("Expected .go to be blocked when profile limits to .dart")
 		}
-		if !isAllowedExtension(".dart", cfg) {
+		if !annotate.IsAllowedExtension(".dart", cfg) {
 			t.Error("Expected .dart to be allowed by profile")
 		}
 	})
@@ -96,8 +95,7 @@ func TestAtomicWrite(t *testing.T) {
 	filePath := filepath.Join(tempDir, "atomic.txt")
 	data := []byte("hello atomic")
 
-	// Test podstawowego zapisu
-	if err := atomicWrite(filePath, data); err != nil {
+	if err := annotate.AtomicWrite(filePath, data); err != nil {
 		t.Fatalf("atomicWrite failed: %v", err)
 	}
 
@@ -106,7 +104,6 @@ func TestAtomicWrite(t *testing.T) {
 		t.Errorf("got %s, want %s", string(got), string(data))
 	}
 
-	// Sprawdzenie czy nie ma plików .tmp
 	files, _ := os.ReadDir(tempDir)
 	for _, f := range files {
 		if strings.Contains(f.Name(), ".tmp") {
@@ -120,19 +117,21 @@ func TestAnnotateFile_Integration(t *testing.T) {
 	path := filepath.Join(tempDir, "main.go")
 	os.WriteFile(path, []byte("package main"), 0644)
 
-	cfg := Config{
+	cfg := annotate.Config{
 		ProfilesConfig: &profiles.Config{
 			CommentStyles: map[string]string{".go": "// %s"},
 		},
 	}
 
-	err := AnnotateFile(path, cfg)
+	err := annotate.AnnotateFile(path, cfg, func(relPath string, style string) string {
+		return "cmdr: " + relPath
+	})
 	if err != nil {
 		t.Fatalf("AnnotateFile failed: %v", err)
 	}
 
 	content, _ := os.ReadFile(path)
-	if !strings.HasPrefix(string(content), "//") {
+	if !strings.Contains(string(content), "cmdr:") {
 		t.Error("File was not annotated")
 	}
 	if !strings.Contains(string(content), "main.go") {

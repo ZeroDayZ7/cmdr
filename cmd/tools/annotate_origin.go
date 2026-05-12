@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	annotate "github.com/zerodayz7/cmdr/internal/annotate_origin"
+	shared "github.com/zerodayz7/cmdr/internal/annotate"
+	origin "github.com/zerodayz7/cmdr/internal/annotate_origin"
 	"github.com/zerodayz7/cmdr/internal/logger"
 	"github.com/zerodayz7/cmdr/internal/profiles"
 )
@@ -42,14 +43,14 @@ func NewAnnotateCmd() *cobra.Command {
 				}
 			}
 
-			logger := &logger.ConsoleLogger{IsVerbose: verbose}
+			consoleLogger := &logger.ConsoleLogger{IsVerbose: verbose}
 
-			cfg := annotate.Config{
+			cfg := shared.Config{
 				DryRun:         dryRun,
 				Verbose:        verbose,
 				Profile:        activeProfile,
 				ProfilesConfig: profilesConfig,
-				Log:            logger,
+				Log:            consoleLogger,
 			}
 
 			var paths []string
@@ -63,6 +64,12 @@ func NewAnnotateCmd() *cobra.Command {
 					if err != nil {
 						return err
 					}
+					if shared.ShouldIgnore(path, cfg) {
+						if info.IsDir() {
+							return filepath.SkipDir
+						}
+						return nil
+					}
 					if !info.IsDir() {
 						paths = append(paths, path)
 					}
@@ -74,16 +81,16 @@ func NewAnnotateCmd() *cobra.Command {
 			}
 
 			if verbose {
-				logger.Info("Starting annotation process for %d files...", len(paths))
+				consoleLogger.Info("Starting annotation process for %d files...", len(paths))
 			}
 
-			results := annotate.ProcessBatch(cmd.Context(), paths, cfg)
+			results := origin.ProcessBatch(cmd.Context(), paths, cfg)
 
 			var errCount int
 			for _, res := range results {
 				if res.Err != nil {
 					errCount++
-					logger.Error("%s: %v", res.Path, res.Err)
+					consoleLogger.Error("%s: %v", res.Path, res.Err)
 				}
 			}
 

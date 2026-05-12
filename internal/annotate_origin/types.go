@@ -1,4 +1,4 @@
-package annotate
+package annotate_origin
 
 import "github.com/zerodayz7/cmdr/internal/profiles"
 

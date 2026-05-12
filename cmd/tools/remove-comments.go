@@ -57,7 +57,7 @@ func removeCommentsFromFile(filePath string) error {
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
 
-	fmt.Printf("✨ Cleaned: %s\n", filePath)
+	fmt.Printf("Cleaned: %s\n", filePath)
 	return nil
 }
 

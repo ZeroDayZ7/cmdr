@@ -1,4 +1,4 @@
-package annotate
+package annotate_origin
 
 import (
 	"context"
@@ -6,12 +6,15 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/zerodayz7/cmdr/internal/annotate" // Importuj shared
 	"github.com/zerodayz7/cmdr/internal/profiles"
 )
 
 func TestProcessBatch_ContextCancellation(t *testing.T) {
 	tempDir := t.TempDir()
-	cfg := Config{
+
+	// KLUCZOWA POPRAWKA: Używamy typu z pakietu shared
+	cfg := annotate.Config{
 		ProfilesConfig: &profiles.Config{
 			CommentStyles: map[string]string{".go": "// %s"},
 		},
@@ -20,7 +23,10 @@ func TestProcessBatch_ContextCancellation(t *testing.T) {
 	// Tworzymy dużą liczbę plików
 	var paths []string
 	for i := 0; i < 100; i++ {
-		p := filepath.Join(tempDir, "file_"+string(rune(i))+".go")
+		// Używamy fmt.Sprintf zamiast string(rune), żeby nazwy były czytelne
+		p := filepath.Join(tempDir, filepath.Clean(filepath.Join("/", "file_"+string(rune(i))+".go")))
+		// Lepiej tak:
+		// p := filepath.Join(tempDir, fmt.Sprintf("file_%d.go", i))
 		os.WriteFile(p, []byte("package test"), 0644)
 		paths = append(paths, p)
 	}
@@ -29,6 +35,7 @@ func TestProcessBatch_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
+	// Teraz typ cfg zgadza się z tym, czego oczekuje ProcessBatch
 	results := ProcessBatch(ctx, paths, cfg)
 
 	// Przy anulowanym kontekście nie powinniśmy przetworzyć wszystkich plików

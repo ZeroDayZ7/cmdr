@@ -1,14 +1,17 @@
-package annotate
+package annotate_origin
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"sync"
+
+	"github.com/zerodayz7/cmdr/internal/annotate"
 )
 
 type Task struct {
 	Path string
-	Cfg  Config
+	Cfg  annotate.Config
 }
 
 type Result struct {
@@ -16,15 +19,20 @@ type Result struct {
 	Err  error
 }
 
-func ProcessBatch(ctx context.Context, paths []string, cfg Config) []Result {
-	numWorkers := min(runtime.NumCPU(), len(paths))
+func ProcessBatch(ctx context.Context, paths []string, cfg annotate.Config) []Result {
+	numWorkers := runtime.NumCPU()
+	if len(paths) < numWorkers {
+		numWorkers = len(paths)
+	}
 
 	tasks := make(chan Task, len(paths))
 	results := make(chan Result, len(paths))
 	var wg sync.WaitGroup
 
 	for range numWorkers {
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			for {
 				select {
 				case <-ctx.Done():
@@ -33,11 +41,13 @@ func ProcessBatch(ctx context.Context, paths []string, cfg Config) []Result {
 					if !ok {
 						return
 					}
-					err := AnnotateFile(task.Path, task.Cfg)
+					err := annotate.AnnotateFile(task.Path, task.Cfg, func(relPath string, style string) string {
+						return fmt.Sprintf(style, "cmdr: "+relPath)
+					})
 					results <- Result{Path: task.Path, Err: err}
 				}
 			}
-		})
+		}()
 	}
 
 UploadLoop:

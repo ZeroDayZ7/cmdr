@@ -1,7 +1,8 @@
 package profiles
 
 type GlobalConfig struct {
-	Ignore []string `json:"ignore"`
+	Ignore            []string `json:"ignore"`
+	IgnoredExtensions []string `json:"ignored_extensions"`
 }
 
 type DetectCriteria struct {
@@ -10,13 +11,19 @@ type DetectCriteria struct {
 	Extensions []string `json:"extensions"`
 }
 
+type RegionPattern struct {
+	Regex string `json:"regex"`
+	Style string `json:"style"`
+}
+
 type Profile struct {
-	Name       string         `json:"name"`
-	Priority   int            `json:"priority"`
-	Detect     DetectCriteria `json:"detect"`
-	Extensions []string       `json:"extensions"`
-	Ignore     []string       `json:"ignore"`
-	Generated  []string       `json:"generated"`
+	Name           string          `json:"name"`
+	Priority       int             `json:"priority"`
+	Detect         DetectCriteria  `json:"detect"`
+	Extensions     []string        `json:"extensions"`
+	Ignore         []string        `json:"ignore"`
+	Generated      []string        `json:"generated"`
+	RegionPatterns []RegionPattern `json:"region_patterns"`
 }
 
 type Config struct {

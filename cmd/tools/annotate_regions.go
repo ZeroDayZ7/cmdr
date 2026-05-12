@@ -2,8 +2,9 @@ package tools
 
 import (
 	"github.com/spf13/cobra"
-	annotate "github.com/zerodayz7/cmdr/internal/annotate_region"
-	"github.com/zerodayz7/cmdr/internal/logger" // Import musi być użyty
+	"github.com/zerodayz7/cmdr/internal/annotate" // Import współdzielonego pakietu
+	region "github.com/zerodayz7/cmdr/internal/annotate_region"
+	"github.com/zerodayz7/cmdr/internal/logger"
 )
 
 var (
@@ -11,8 +12,7 @@ var (
 	regFile    string
 	regDryRun  bool
 	regVerbose bool
-	// Inicjalizujemy logger, aby był dostępny w całym pliku
-	log = &logger.ConsoleLogger{}
+	log        = &logger.ConsoleLogger{}
 )
 
 func NewAnnotateRegionsCmd() *cobra.Command {
@@ -21,9 +21,11 @@ func NewAnnotateRegionsCmd() *cobra.Command {
 		Aliases: []string{"reg", "ann"},
 		Short:   "Wraps functions with #region tags",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Używamy typu Config z pakietu shared (annotate)
 			cfg := annotate.Config{
 				DryRun:  regDryRun,
 				Verbose: regVerbose,
+				Log:     log, // Przekazujemy logger do konfiguracji
 			}
 
 			target := regDir
@@ -35,13 +37,11 @@ func NewAnnotateRegionsCmd() *cobra.Command {
 			}
 
 			if cfg.DryRun {
-				// Teraz 'log' jest zdefiniowany powyżej
 				log.Info("Running in DRY-RUN mode. No files will be modified.")
 			}
 
-			err := annotate.Process(target, cfg)
+			err := region.Process(target, cfg, cmd.Context())
 			if err != nil {
-				// Log błędu przed wyjściem
 				log.Error("Annotation failed: %v", err)
 				return err
 			}
