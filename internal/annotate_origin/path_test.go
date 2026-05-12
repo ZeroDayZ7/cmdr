@@ -23,18 +23,22 @@ func TestBuildRelativePath(t *testing.T) {
 }
 
 func TestFindProjectRoot_Monorepo(t *testing.T) {
-	// W testach w Go często tworzy się tymczasową strukturę katalogów
 	tempDir := t.TempDir()
 
 	repoRoot := filepath.Join(tempDir, "repo")
 	subApp := filepath.Join(repoRoot, "apps/api")
 
-	os.MkdirAll(subApp, 0755)
+	if err := os.MkdirAll(subApp, 0755); err != nil {
+		t.Fatalf("failed to create directory structure: %v", err)
+	}
 
-	// Tworzymy go.mod w root
-	os.WriteFile(filepath.Join(repoRoot, "go.mod"), []byte("module test"), 0644)
-	// Tworzymy package.json w subApp
-	os.WriteFile(filepath.Join(subApp, "package.json"), []byte("{}"), 0644)
+	if err := os.WriteFile(filepath.Join(repoRoot, "go.mod"), []byte("module test"), 0644); err != nil {
+		t.Fatalf("failed to write root go.mod: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(subApp, "package.json"), []byte("{}"), 0644); err != nil {
+		t.Fatalf("failed to write sub-app package.json: %v", err)
+	}
 
 	t.Run("Should find nearest root (subApp)", func(t *testing.T) {
 		root, err := FindProjectRoot(subApp, Config{})

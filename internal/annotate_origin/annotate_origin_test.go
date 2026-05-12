@@ -115,7 +115,12 @@ func TestAtomicWrite(t *testing.T) {
 func TestAnnotateFile_Integration(t *testing.T) {
 	tempDir := t.TempDir()
 	path := filepath.Join(tempDir, "main.go")
-	os.WriteFile(path, []byte("package main"), 0644)
+
+	// 1. Sprawdzamy błąd zapisu - jeśli setup zawiedzie, nie ma sensu iść dalej
+	err := os.WriteFile(path, []byte("package main"), 0644)
+	if err != nil {
+		t.Fatalf("failed to setup test file: %v", err)
+	}
 
 	cfg := annotate.Config{
 		ProfilesConfig: &profiles.Config{
@@ -123,18 +128,26 @@ func TestAnnotateFile_Integration(t *testing.T) {
 		},
 	}
 
-	err := annotate.AnnotateFile(path, cfg, func(relPath string, style string) string {
+	// 2. Wywołanie funkcji testowanej - err już jest zadeklarowany wyżej, więc używamy '='
+	err = annotate.AnnotateFile(path, cfg, func(relPath string, style string) string {
 		return "cmdr: " + relPath
 	})
 	if err != nil {
 		t.Fatalf("AnnotateFile failed: %v", err)
 	}
 
-	content, _ := os.ReadFile(path)
-	if !strings.Contains(string(content), "cmdr:") {
-		t.Error("File was not annotated")
+	// 3. Sprawdzamy błąd odczytu - ignorowanie go ('_') to ryzykowna praktyka
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read annotated file: %v", err)
 	}
-	if !strings.Contains(string(content), "main.go") {
-		t.Error("Annotation does not contain filename")
+
+	// 4. Asercje
+	result := string(content)
+	if !strings.Contains(result, "cmdr:") {
+		t.Error("File was not annotated: missing 'cmdr:' prefix")
+	}
+	if !strings.Contains(result, "main.go") {
+		t.Error("Annotation does not contain filename 'main.go'")
 	}
 }
