@@ -17,6 +17,7 @@ var (
 	outputFile  string
 	extensions  string
 	excludeDirs string
+	includeDirs string // Nowa flaga na konkretne foldery
 )
 
 // #region NewFilesCombineCmd
@@ -31,13 +32,13 @@ func NewFilesCombineCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&extensions, "extensions", "e", "", "Override: Comma-separated extensions (e.g. go,proto)")
 	cmd.Flags().StringVarP(&outputFile, "name", "n", "combined.txt", "Name of the output file")
 	cmd.Flags().StringVarP(&excludeDirs, "exclude", "x", "", "Override: Additional directories to exclude")
+	cmd.Flags().StringVarP(&includeDirs, "dir", "d", "", "Target directories to scan, comma-separated (e.g. internal/profiles,pkg)")
 
 	return cmd
 }
 
 // #region runFilesCombine
 func runFilesCombine(cmd *cobra.Command, args []string) error {
-
 	cfg, err := profiles.LoadConfig()
 	if err != nil {
 		return err
@@ -53,6 +54,12 @@ func runFilesCombine(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Detected profile: %s\n", activeProfile.Name)
 	}
 
+	// Ustalamy punkty startowe dla skanowania
+	targets := []string{"."}
+	if includeDirs != "" {
+		targets = utils.ParseCommaSeparated(includeDirs)
+	}
+
 	file, err := os.Create(outputFile)
 	if err != nil {
 		return err
@@ -62,32 +69,49 @@ func runFilesCombine(cmd *cobra.Command, args []string) error {
 	writer := bufio.NewWriter(file)
 	defer writer.Flush()
 
-	err = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	// Iterujemy po każdym wskazanym katalogu docelowym
+	for _, target := range targets {
+		// Czyścimy ścieżkę (np. usuwamy zbędne slashe na końcu)
+		targetClean := filepath.Clean(target)
+
+		// Sprawdzamy czy katalog w ogóle istnieje, żeby nie wywalić się w połowie zapisu
+		if _, err := os.Stat(targetClean); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Warning: Target directory does not exist: %s\n", targetClean)
+			continue
+		}
+
+		err = filepath.Walk(targetClean, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			name := info.Name()
+
+			if info.IsDir() {
+				// Bezpieczne sprawdzanie ignorowanych folderów niezależnie od głębokości ścieżki
+				if isIgnored(name, ignoredItems) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
+			ext := strings.ToLower(filepath.Ext(path))
+			if !isAllowed(ext, name, finalExtensions, activeProfile) {
+				return nil
+			}
+
+			// Przekazujemy 'path' zamiast 'name' do nagłówka pliku,
+			// aby w pliku wynikowym było widać pełną ścieżkę (np. internal/profiles/file.go)
+			return writeFileContent(writer, path, path)
+		})
+
 		if err != nil {
 			return err
 		}
-
-		name := info.Name()
-
-		if info.IsDir() {
-			if isIgnored(name, ignoredItems) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		ext := strings.ToLower(filepath.Ext(path))
-		if !isAllowed(ext, name, finalExtensions, activeProfile) {
-			return nil
-		}
-
-		return writeFileContent(writer, path, name)
-	})
-
-	if err == nil {
-		fmt.Printf("✅ Finished! Combined into: %s\n", outputFile)
 	}
-	return err
+
+	fmt.Printf("✅ Finished! Combined into: %s\n", outputFile)
+	return nil
 }
 
 // #region prepareExtensions
@@ -120,7 +144,6 @@ func isIgnored(name string, ignoredList []string) bool {
 
 // #region isAllowed
 func isAllowed(ext, name string, allowedExts []string, p *profiles.Profile) bool {
-
 	found := false
 	for _, e := range allowedExts {
 		if strings.TrimPrefix(e, ".") == strings.TrimPrefix(ext, ".") {
@@ -144,24 +167,23 @@ func isAllowed(ext, name string, allowedExts []string, p *profiles.Profile) bool
 }
 
 // #region writeFileContent
-func writeFileContent(w *bufio.Writer, path, name string) error {
+func writeFileContent(w *bufio.Writer, path, headerName string) error {
 	content, err := os.ReadFile(path)
 	if err != nil {
-
 		fmt.Fprintf(os.Stderr, "Warning: could not read file %s: %v\n", path, err)
 		return nil
 	}
 
-	if _, err := fmt.Fprintf(w, "───────────── %s ─────────────\n", name); err != nil {
-		return fmt.Errorf("failed to write header for %s: %w", name, err)
+	if _, err := fmt.Fprintf(w, "───────────── %s ─────────────\n", headerName); err != nil {
+		return fmt.Errorf("failed to write header for %s: %w", headerName, err)
 	}
 
 	if _, err := w.Write(content); err != nil {
-		return fmt.Errorf("failed to write content of %s: %w", name, err)
+		return fmt.Errorf("failed to write content of %s: %w", headerName, err)
 	}
 
 	if _, err := w.WriteString("\n\n"); err != nil {
-		return fmt.Errorf("failed to write separator after %s: %w", name, err)
+		return fmt.Errorf("failed to write separator after %s: %w", headerName, err)
 	}
 
 	return nil
