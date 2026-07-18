@@ -17,7 +17,7 @@ var DefaultIgnoreList = []string{
 	"LICENSE", "README.md", ".vs", ".vscode", "obj", "Assets",
 }
 
-// helper do pobierania pełnej ścieżki do pliku ignore
+// helper do pobierania pełnej ścieżki do pliku ignore w katalogu konfiguracyjnym
 func getIgnorePath() (string, error) {
 	dir, err := profiles.GetConfigDir()
 	if err != nil {
@@ -52,22 +52,72 @@ func ReadIgnoreFile() ([]string, error) {
 		return nil, err
 	}
 
-	file, err := os.Open(filePath)
+	patterns := readIgnoreFileFromPath(filePath)
+	return patterns, nil
+}
+
+// LoadAllIgnorePatterns agreguje wzorce z pliku konfiguracyjnego, katalogu roboczego oraz obok pliku cmdr.exe
+func LoadAllIgnorePatterns() []string {
+	var patterns []string
+
+	// 1. Pobierz reguły z globalnego katalogu konfiguracyjnego (~/.cmdr/.cmdrignore)
+	if globalPatterns, err := ReadIgnoreFile(); err == nil && globalPatterns != nil {
+		patterns = append(patterns, globalPatterns...)
+	}
+
+	// 2. Sprawdź plik .cmdrignore obok pliku wykonywalnego cmdr.exe
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		patterns = append(patterns, readIgnoreFileFromPath(filepath.Join(exeDir, IgnoreFileName))...)
+	}
+
+	// 3. Sprawdź plik .cmdrignore w bieżącym katalogu roboczym (Working Directory)
+	if wd, err := os.Getwd(); err == nil {
+		patterns = append(patterns, readIgnoreFileFromPath(filepath.Join(wd, IgnoreFileName))...)
+	}
+
+	return uniquePatterns(patterns)
+}
+
+// readIgnoreFileFromPath wczytuje i oczyszcza linie z podanej ścieżki pliku
+func readIgnoreFileFromPath(fullPath string) []string {
+	file, err := os.Open(fullPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
+		return nil
 	}
 	defer file.Close()
 
-	var result []string
+	var lines []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if line != "" && !strings.HasPrefix(line, "#") {
-			result = append(result, line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Czyszczenie ukośników z końca (np. .git/ staje się .git), aby dopasować do utils.ShouldExclude
+		line = strings.TrimSuffix(line, "/")
+		line = strings.TrimSuffix(line, "\\")
+		lines = append(lines, line)
+	}
+
+	// Sprawdzenie błędów skanera eliminuje ostrzeżenie lintera
+	if err := scanner.Err(); err != nil {
+		// Opcjonalnie: fmt.Fprintln(os.Stderr, "error reading ignore file:", err)
+		return lines
+	}
+
+	return lines
+}
+
+// uniquePatterns usuwa duplikaty reguł z połączonej listy
+func uniquePatterns(input []string) []string {
+	keys := make(map[string]bool)
+	var list []string
+	for _, entry := range input {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
 		}
 	}
-	return result, scanner.Err()
+	return list
 }

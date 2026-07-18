@@ -16,6 +16,7 @@ var (
 	exclude         []string
 	format          string
 	copyToClipboard bool
+	depth           int
 	log             = &logger.ConsoleLogger{}
 )
 
@@ -41,7 +42,8 @@ func NewTreeCmd() *cobra.Command {
 				path = args[0]
 			}
 
-			defaultIgnore, _ := tree.ReadIgnoreFile()
+			// Pobieramy ignorowane pliki uwzględniając lokalizację cmdr.exe
+			defaultIgnore := tree.LoadAllIgnorePatterns()
 
 			excludeList := append(defaultIgnore, utils.ParseCommaSeparated(strings.Join(exclude, ","))...)
 
@@ -49,6 +51,7 @@ func NewTreeCmd() *cobra.Command {
 				Path:        path,
 				ExcludeList: excludeList,
 				Format:      format,
+				MaxDepth:    depth,
 			}
 
 			result, err := tree.Generate(opts)
@@ -64,7 +67,6 @@ func NewTreeCmd() *cobra.Command {
 				}
 				log.Success("Tree saved to %s", output)
 			} else if !copyToClipboard {
-
 				os.Stdout.WriteString(result + "\n")
 			}
 
@@ -85,6 +87,9 @@ func NewTreeCmd() *cobra.Command {
 	cmd.Flags().BoolP("generate-ignore", "g", false, "Generate .cmdrignore in your config folder")
 	cmd.Flags().StringVarP(&format, "format", "f", "ascii", "ascii|json|csv|md")
 	cmd.Flags().BoolVarP(&copyToClipboard, "copy", "c", false, "Copy to clipboard")
+
+	// Nowa opcja głębokości: domyślnie 0 lub ujemna oznacza brak limitu (wszystko)
+	cmd.Flags().IntVarP(&depth, "depth", "d", -1, "Max depth of the tree (0: current dir only, 1: current + 1 level, -1: all)")
 
 	return cmd
 }

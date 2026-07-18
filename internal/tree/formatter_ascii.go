@@ -9,16 +9,23 @@ import (
 	"github.com/zerodayz7/cmdr/internal/utils"
 )
 
-func formatASCII(path string, excludeList []string) (string, error) {
+func formatASCII(path string, excludeList []string, maxDepth int) (string, error) {
 	var builder strings.Builder
 	abs, _ := filepath.Abs(path)
-	builder.WriteString(filepath.Base(abs) + "\n")
 
-	err := walkASCII(path, "", excludeList, &builder)
+	// Rozbite wywołania eliminują niepotrzebną alokację pamięci
+	builder.WriteString(filepath.Base(abs))
+	builder.WriteString("\n")
+
+	err := walkASCII(path, "", excludeList, &builder, 0, maxDepth)
 	return builder.String(), err
 }
 
-func walkASCII(path, prefix string, excludeList []string, builder *strings.Builder) error {
+func walkASCII(path, prefix string, excludeList []string, builder *strings.Builder, currentDepth, maxDepth int) error {
+	if maxDepth >= 0 && currentDepth > maxDepth {
+		return nil
+	}
+
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return err
@@ -47,7 +54,8 @@ func walkASCII(path, prefix string, excludeList []string, builder *strings.Build
 			} else {
 				newPrefix += "│   "
 			}
-			if err := walkASCII(filepath.Join(path, entry.Name()), newPrefix, excludeList, builder); err != nil {
+			err := walkASCII(filepath.Join(path, entry.Name()), newPrefix, excludeList, builder, currentDepth+1, maxDepth)
+			if err != nil {
 				return err
 			}
 		}

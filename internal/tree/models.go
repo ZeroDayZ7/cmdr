@@ -10,4 +10,5 @@ type TreeOptions struct {
 	Path        string
 	ExcludeList []string
 	Format      string
+	MaxDepth    int
 }

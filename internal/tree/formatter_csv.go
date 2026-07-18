@@ -10,9 +10,9 @@ import (
 	"github.com/zerodayz7/cmdr/internal/utils"
 )
 
-func formatCSV(path string, excludeList []string) (string, error) {
+func formatCSV(path string, excludeList []string, maxDepth int) (string, error) {
 	records := [][]string{{"path", "type"}}
-	if err := walkCSV(path, "", excludeList, &records); err != nil {
+	if err := walkCSV(path, "", excludeList, &records, 0, maxDepth); err != nil {
 		return "", err
 	}
 
@@ -25,7 +25,11 @@ func formatCSV(path string, excludeList []string) (string, error) {
 	return buf.String(), nil
 }
 
-func walkCSV(path, prefix string, excludeList []string, records *[][]string) error {
+func walkCSV(path, prefix string, excludeList []string, records *[][]string, currentDepth, maxDepth int) error {
+	if maxDepth >= 0 && currentDepth > maxDepth {
+		return nil
+	}
+
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return err
@@ -43,7 +47,7 @@ func walkCSV(path, prefix string, excludeList []string, records *[][]string) err
 		*records = append(*records, row)
 
 		if entry.IsDir() {
-			err := walkCSV(filepath.Join(path, entry.Name()), filepath.Join(prefix, entry.Name()), excludeList, records)
+			err := walkCSV(filepath.Join(path, entry.Name()), filepath.Join(prefix, entry.Name()), excludeList, records, currentDepth+1, maxDepth)
 			if err != nil {
 				return err
 			}
