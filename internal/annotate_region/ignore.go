@@ -1,5 +1,3 @@
-// cmdr: cmdr/internal/annotate_region/ignore.go
-
 package annotate_region
 
 import (
@@ -50,5 +48,10 @@ func LoadIgnoreFile() []string {
 			lines = append(lines, line)
 		}
 	}
+
+	if err := scanner.Err(); err != nil {
+		return nil
+	}
+
 	return lines
 }

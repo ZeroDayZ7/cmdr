@@ -20,10 +20,7 @@ type Result struct {
 }
 
 func ProcessBatch(ctx context.Context, paths []string, cfg annotate.Config) []Result {
-	numWorkers := runtime.NumCPU()
-	if len(paths) < numWorkers {
-		numWorkers = len(paths)
-	}
+	numWorkers := min(len(paths), runtime.NumCPU())
 
 	tasks := make(chan Task, len(paths))
 	results := make(chan Result, len(paths))
@@ -42,7 +39,7 @@ func ProcessBatch(ctx context.Context, paths []string, cfg annotate.Config) []Re
 						return
 					}
 					err := annotate.AnnotateFile(task.Path, task.Cfg, func(relPath string, style string) string {
-						return fmt.Sprintf(style, "cmdr: "+relPath)
+						return fmt.Sprintf(style, relPath)
 					})
 					results <- Result{Path: task.Path, Err: err}
 				}

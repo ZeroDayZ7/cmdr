@@ -130,7 +130,7 @@ func TestAnnotateFile_Integration(t *testing.T) {
 
 	// 2. Wywołanie funkcji testowanej - err już jest zadeklarowany wyżej, więc używamy '='
 	err = annotate.AnnotateFile(path, cfg, func(relPath string, style string) string {
-		return "cmdr: " + relPath
+		return relPath
 	})
 	if err != nil {
 		t.Fatalf("AnnotateFile failed: %v", err)
@@ -142,11 +142,7 @@ func TestAnnotateFile_Integration(t *testing.T) {
 		t.Fatalf("failed to read annotated file: %v", err)
 	}
 
-	// 4. Asercje
-	result := string(content)
-	if !strings.Contains(result, "cmdr:") {
-		t.Error("File was not annotated: missing 'cmdr:' prefix")
-	}
+result := string(content)
 	if !strings.Contains(result, "main.go") {
 		t.Error("Annotation does not contain filename 'main.go'")
 	}

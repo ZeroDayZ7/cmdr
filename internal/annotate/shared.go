@@ -136,10 +136,22 @@ func IsBinary(data []byte) bool {
 	return !utf8.Valid(data[:limit])
 }
 
+//#region HasAnnotation
 func HasAnnotation(content string) bool {
+	lines := strings.SplitN(content, "\n", 3)
+	if len(lines) == 0 {
+		return false
+	}
 
-	return strings.Contains(content, "cmdr:")
+	firstLine := strings.TrimSpace(lines[0])
+
+	// Sprawdzamy czy pierwsza linia jest komentarzem jednolinkowym (//, #, <!--, /*)
+	return strings.HasPrefix(firstLine, "//") ||
+		strings.HasPrefix(firstLine, "#") ||
+		strings.HasPrefix(firstLine, "<!--") ||
+		strings.HasPrefix(firstLine, "/*")
 }
+//#endregion
 
 func FindProjectRoot(path string, cfg Config) (string, error) {
 	current := filepath.Dir(path)

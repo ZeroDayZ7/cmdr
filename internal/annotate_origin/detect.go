@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var annotationRegex = regexp.MustCompile(`(?m)^(//|#|--|/\*|<!--)\s*cmdr:`)
+var annotationRegex = regexp.MustCompile(`(?m)^(//|#|--|/\*|<!--)\s*`)
 
 func HasAnnotation(content string) bool {
 	scanner := bufio.NewScanner(strings.NewReader(content))

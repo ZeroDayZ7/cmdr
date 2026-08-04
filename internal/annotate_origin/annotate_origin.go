@@ -29,12 +29,8 @@ func Process(targetPath string, cfg annotate.Config, ctx context.Context) error 
 				case <-childCtx.Done():
 					return
 				default:
-					// TUTAJ POPRAWKA:
-					// 1. Używamy annotate.AnnotateFile (z dużej litery)
-					// 2. Podajemy logikę generowania komentarza dla "origin"
 					err := annotate.AnnotateFile(path, cfg, func(relPath string, style string) string {
-						// Styl dla origin: prosta adnotacja cmdr: ścieżka
-						return fmt.Sprintf(style, "cmdr: "+relPath)
+						return fmt.Sprintf(style, relPath)
 					})
 
 					if err != nil {
@@ -58,7 +54,6 @@ func Process(targetPath string, cfg annotate.Config, ctx context.Context) error 
 				return err
 			}
 
-			// POPRAWKA: annotate.ShouldIgnore (z dużej litery)
 			if annotate.ShouldIgnore(path, cfg) {
 				if info.IsDir() {
 					return filepath.SkipDir

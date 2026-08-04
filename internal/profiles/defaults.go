@@ -12,7 +12,7 @@ const DefaultProfilesConfig = `{
   },
 
   "comment_styles": {
-    ".go": "// cmdr: %s",
+    ".go": "// %s",
     ".js": "// cmdr: %s",
     ".jsx": "// cmdr: %s",
     ".ts": "// cmdr: %s",
