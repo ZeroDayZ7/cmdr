@@ -94,6 +94,10 @@ func InjectComment(content, comment string) string {
 }
 
 func ShouldIgnore(path string, cfg Config) bool {
+	if cfg.ProfilesConfig == nil {
+		return false
+	}
+
 	cleanPath := filepath.ToSlash(path)
 	ignores := cfg.ProfilesConfig.Global.Ignore
 	if cfg.Profile != nil {
@@ -120,6 +124,11 @@ func IsAllowedExtension(ext string, cfg Config) bool {
 		}
 		return false
 	}
+
+	if cfg.ProfilesConfig == nil || cfg.ProfilesConfig.CommentStyles == nil {
+		return strings.EqualFold(ext, ".go")
+	}
+
 	_, ok := cfg.ProfilesConfig.CommentStyles[strings.ToLower(ext)]
 	return ok
 }

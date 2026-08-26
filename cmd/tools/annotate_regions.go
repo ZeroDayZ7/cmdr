@@ -1,18 +1,23 @@
 package tools
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/spf13/cobra"
-	"github.com/zerodayz7/cmdr/internal/annotate" // Import współdzielonego pakietu
+	"github.com/zerodayz7/cmdr/internal/annotate"
 	region "github.com/zerodayz7/cmdr/internal/annotate_region"
 	"github.com/zerodayz7/cmdr/internal/logger"
+	"github.com/zerodayz7/cmdr/internal/profiles"
 )
 
 var (
-	regDir     string
-	regFile    string
-	regDryRun  bool
+	regDir      string
+	regFile     string
+	regProfile  string
+	regDryRun   bool
 	regVerbose bool
-	log        = &logger.ConsoleLogger{}
+	log         = &logger.ConsoleLogger{}
 )
 
 func NewAnnotateRegionsCmd() *cobra.Command {
@@ -21,11 +26,10 @@ func NewAnnotateRegionsCmd() *cobra.Command {
 		Aliases: []string{"reg", "ann"},
 		Short:   "Wraps functions with #region tags",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Używamy typu Config z pakietu shared (annotate)
-			cfg := annotate.Config{
-				DryRun:  regDryRun,
-				Verbose: regVerbose,
-				Log:     log, // Przekazujemy logger do konfiguracji
+			// 1. Ładowanie konfiguracji profilów
+			profilesConfig, err := profiles.LoadConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load profiles: %w", err)
 			}
 
 			target := regDir
@@ -36,23 +40,51 @@ func NewAnnotateRegionsCmd() *cobra.Command {
 				target = "."
 			}
 
-			if cfg.DryRun {
-				log.Info("Running in DRY-RUN mode. No files will be modified.")
+			// 2. Wykrywanie lub dopasowywanie profilu
+			absTarget, _ := filepath.Abs(target)
+			var activeProfile *profiles.Profile
+
+			if regProfile != "" {
+				for _, p := range profilesConfig.Profiles {
+					if p.Name == regProfile {
+						pCopy := p
+						activeProfile = &pCopy
+						break
+					}
+				}
+			} else {
+				activeProfile = profiles.DetectProjectProfile(absTarget, profilesConfig)
 			}
 
-			err := region.Process(target, cfg, cmd.Context())
+			consoleLogger := &logger.ConsoleLogger{IsVerbose: regVerbose}
+
+			// 3. Poprawne przekazanie ProfilesConfig do obiektu Config
+			cfg := annotate.Config{
+				DryRun:         regDryRun,
+				Verbose:        regVerbose,
+				Profile:        activeProfile,
+				ProfilesConfig: profilesConfig,
+				Log:            consoleLogger,
+			}
+
+			if cfg.DryRun {
+				consoleLogger.Info("Running in DRY-RUN mode. No files will be modified.")
+			}
+
+			err = region.Process(target, cfg, cmd.Context())
 			if err != nil {
-				log.Error("Annotation failed: %v", err)
+				consoleLogger.Error("Annotation failed: %v", err)
 				return err
 			}
 
-			log.Success("Process finished successfully.")
+			consoleLogger.Success("Process finished successfully.")
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVarP(&regDir, "directory", "d", "", "Directory to process")
 	cmd.Flags().StringVarP(&regFile, "file", "f", "", "Specific file to process")
+	cmd.Flags().StringVarP(&regProfile, "profile", "p", "", "Use specific profile (e.g. go, typescript, flutter)")
 	cmd.Flags().BoolVar(&regDryRun, "dry-run", false, "Preview changes without modifying files")
 	cmd.Flags().BoolVarP(&regVerbose, "verbose", "v", false, "Print detailed information")
 

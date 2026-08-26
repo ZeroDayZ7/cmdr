@@ -1,10 +1,11 @@
+// cmdr: cmd\crypto\crypto.go
+
 package crypto
 
 import (
 	"github.com/spf13/cobra"
 )
 
-// NewCmd tworzy główną komendę `crypto`
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "crypto",

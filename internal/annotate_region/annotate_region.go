@@ -19,6 +19,13 @@ func Process(targetPath string, cfg annotate.Config, ctx context.Context) error 
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Przygotowanie lokalnej konfiguracji dla regionów
+	regionCfg := Config{
+		DryRun:  cfg.DryRun,
+		Verbose: cfg.Verbose,
+		Context: ctx,
+	}
+
 	for i := 0; i < runtime.NumCPU(); i++ {
 		wg.Go(func() {
 			for path := range paths {
@@ -26,11 +33,8 @@ func Process(targetPath string, cfg annotate.Config, ctx context.Context) error 
 				case <-childCtx.Done():
 					return
 				default:
-
-					err := annotate.AnnotateFile(path, cfg, func(relPath string, style string) string {
-
-						return fmt.Sprintf(style, relPath)
-					})
+					// Podmiana: zamiast annotate.AnnotateFile wywołujemy AnnotateRegions
+					_, err := AnnotateRegions(path, regionCfg, cfg.Profile, cfg.ProfilesConfig)
 
 					if err != nil {
 						select {
