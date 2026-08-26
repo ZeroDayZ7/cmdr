@@ -12,12 +12,11 @@ import (
 )
 
 var (
-	regDir      string
-	regFile     string
-	regProfile  string
-	regDryRun   bool
+	regDir     string
+	regFile    string
+	regProfile string
+	regDryRun  bool
 	regVerbose bool
-	log         = &logger.ConsoleLogger{}
 )
 
 func NewAnnotateRegionsCmd() *cobra.Command {
