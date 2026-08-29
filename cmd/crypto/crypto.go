@@ -17,6 +17,8 @@ func NewCmd() *cobra.Command {
 		newGenerateKeyCmd(),
 		newEncryptCmd(),
 		newDecryptCmd(),
+		newPassEncryptCmd(),
+		newPassDecryptCmd(),
 		// newHashCmd(),
 		newRandomCmd(),
 	)

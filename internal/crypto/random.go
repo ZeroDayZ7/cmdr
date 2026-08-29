@@ -1,3 +1,4 @@
+// internal/crypto/random.go
 package crypto
 
 import (
@@ -39,6 +40,23 @@ func GenerateRandomString(length int) (string, error) {
 			return "", fmt.Errorf("failed to generate random string: %w", err)
 		}
 		result[i] = letters[num.Int64()]
+	}
+	return string(result), nil
+}
+
+// GenerateRandomPassword generates a secure password with letters, numbers, and symbols
+func GenerateRandomPassword(length int) (string, error) {
+	if length <= 0 {
+		return "", fmt.Errorf("length must be positive")
+	}
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		if err != nil {
+			return "", fmt.Errorf("failed to generate random password: %w", err)
+		}
+		result[i] = chars[num.Int64()]
 	}
 	return string(result), nil
 }
