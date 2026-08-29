@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/zerodayz7/cmdr/cmd/bootstrap"
 	"github.com/zerodayz7/cmdr/cmd/crypto"
 	"github.com/zerodayz7/cmdr/cmd/general"
 	"github.com/zerodayz7/cmdr/cmd/info"
@@ -36,6 +37,7 @@ func Execute() {
 // #region init
 func init() {
 	rootCmd.AddCommand(
+		bootstrap.NewBootstrapCmd(),
 		crypto.NewCmd(),               // crypto
 		general.NewHelloCmd(l),        // hello
 		info.NewInfoCmd(),             // info
