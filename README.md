@@ -3,19 +3,8 @@
 A fast, developer-friendly CLI for bootstrapping microservices and handy Go tools.
 
 ## Table of Contents
-<!-- * [Features](#features) -->
-<!-- * [Usage](#usage) -->
-<!-- * [Configuration](#configuration-file) -->
-* [Project Profiles (Smart Detection)](./docs/PROFILES_GUIDE.md)
-<!-- * [Available Commands](#other-available-commands) -->
-<!-- * [Flags](#flags) -->
 
-## Features
-
-* Scaffold microservices in seconds
-* Generate boilerplate for Go projects
-* Handy developer utilities
-* Custom templates for your services
+- [Project Profiles (Smart Detection)](./docs/PROFILES_GUIDE.md)
 
 ## Usage
 
@@ -24,6 +13,7 @@ Cmdr helps you run tasks like migrations, dev servers, and more.
 ```bash
 # Show help
 cmdr --help
+
 ```
 
 ## Example Command: `ask`
@@ -32,27 +22,47 @@ The `ask` command allows you to send a question to an API (e.g., Gemini API) and
 
 ```bash
 cmdr ask -q "test"
+
 ```
 
 ## Output:
 
 ```bash
 Response: Okay, I'm here! What would you like me to do?
+
+```
+
+## Example Command: `crypto`
+
+The `crypto` command provides cryptographic utilities including file encryption (AES-GCM / Argon2id), key generation, and random data creation.
+
+```bash
+# Generate a secure 20-character password
+cmdr crypto r -t p -l 20
+
+# Generate a 32-byte AES key (HEX/Base64)
+cmdr crypto r -t a -l 32
+
+# Encrypt a file using a password (Argon2id + AES-GCM)
+cmdr crypto pass-encrypt -f secret.txt -p MyPassword123
+
+# Decrypt a file encrypted with Argon2id
+cmdr crypto pass-decrypt -f encrypted/secret.txt.enc -p MyPassword123
+
 ```
 
 ## Configuration File
 
 When you first run the ask command, a .config.json file will be generated in the same directory as the executable. This file will look like this:
 
-```bash
+```json
 {
   "gemini": {
-    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+    "url": "[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent)",
     "apiKey": "your_gemini_api_key_here"
   }
 }
 ```
-
 
 ## Other Available Commands
 
@@ -70,6 +80,7 @@ Available Commands:
   clear           Deletes all directories with the given name in the current project
   completion      Generate the autocompletion script for the specified shell
   create-service  Create a new microservice from a template
+  crypto          Cryptographic operations: keys, encryption, random data, hashing
   files-combine   Combine contents of files with chosen extensions into one file
   hello           Say hello
   help            Help about any command
@@ -84,18 +95,9 @@ Flags:
   -h, --help   help for cmdr
 
 Use "cmdr [command] --help" for more information about a command.
+
 ```
 
 ## Flags
 
-* `-h`, `--help`: Display help for the `cmdr` command or any individual command.
-
-## Example: Ask Command with Additional File Flag
-
-You can also send a file along with your query to the `ask` command using the `-f` flag:
-
-```bash
-cmdr ask -q "What is the weather today?" -f example.txt
-```
-
-This will send the contents of `example.txt` along with your question to the API.
+- `-h`, `--help`: Display help for the `cmdr` command or any individual command.
