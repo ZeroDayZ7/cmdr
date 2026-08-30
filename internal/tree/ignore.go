@@ -12,9 +12,24 @@ import (
 const IgnoreFileName = ".cmdrignore"
 
 var DefaultIgnoreList = []string{
-	".git", "node_modules", "bin", "dist", ".DS_Store",
-	"out", "docs", "templates", ".gitattributes", ".gitignore",
-	"LICENSE", "README.md", ".vs", ".vscode", "obj", "Assets",
+	// Wersjonowanie i narzędzia programistyczne
+	".git", ".github", ".gitattributes", ".gitignore", ".idea", ".vs", ".vscode",
+	"LICENSE", "README.md", "scripts", "test",
+
+	// Zbudowane pliki binarne i katalogi wyjściowe
+	"bin", "dist", "out", "target", "build", "obj",
+
+	// Web, Node.js i Angular
+	"node_modules", ".angular",
+
+	// Flutter i Dart
+	".dart_tool", ".flutter-plugins-dependencies", ".metadata",
+
+	// Zasoby i specyficzne dla systemów / IDE
+	".DS_Store", "docs", "templates", "raw_assets", "Assets",
+
+	// Platformy mobilne i desktopowe
+	"android", "ios", "linux", "macos", "web", "windows",
 }
 
 // helper do pobierania pełnej ścieżki do pliku ignore w katalogu konfiguracyjnym

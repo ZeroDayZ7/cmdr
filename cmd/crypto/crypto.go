@@ -1,5 +1,3 @@
-// cmdr: cmd\crypto\crypto.go
-
 package crypto
 
 import (
@@ -8,11 +6,11 @@ import (
 
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "crypto",
-		Short: "Operacje kryptograficzne: klucze, szyfrowanie, hashowanie",
+		Use:     "crypto",
+		Aliases: []string{"c"},
+		Short:   "Operacje kryptograficzne: klucze, szyfrowanie, hashowanie",
 	}
 
-	// Dodaj podkomendy
 	cmd.AddCommand(
 		newGenerateKeyCmd(),
 		newEncryptCmd(),

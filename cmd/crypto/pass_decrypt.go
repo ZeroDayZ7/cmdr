@@ -18,7 +18,7 @@ var (
 func newPassDecryptCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pass-decrypt",
-		Aliases: []string{"pdec"},
+		Aliases: []string{"pd"},
 		Short:   "Decrypt a file encrypted with Argon2id",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if passDecFile == "" {

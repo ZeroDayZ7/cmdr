@@ -18,7 +18,7 @@ var (
 func newPassEncryptCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pass-encrypt",
-		Aliases: []string{"penc"},
+		Aliases: []string{"pe"},
 		Short:   "Encrypt a file using a password (Argon2id + AES-GCM)",
 		Long: `
 Encrypts a single file using a user-provided password.
