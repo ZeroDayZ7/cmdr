@@ -25,7 +25,8 @@ const DefaultProfilesConfig = `{
     ".css": "/* cmdr: %s */",
     ".scss": "/* cmdr: %s */",
     ".html": "<!-- cmdr: %s -->",
-    ".md": "<!-- cmdr: %s -->"
+    ".md": "<!-- cmdr: %s -->",
+    ".rs": "// cmdr: %s"
   },
 
   "profiles": [
@@ -134,6 +135,22 @@ const DefaultProfilesConfig = `{
       "ignore": [
         "vendor"
       ],
+
+      "generated": []
+    },
+    {
+      "name": "rust",
+      "priority": 85,
+
+      "detect": {
+        "files": ["Cargo.toml"],
+        "folders": ["src", "benches"],
+        "extensions": [".rs"]
+      },
+
+      "extensions": [".rs", ".toml"],
+
+      "ignore": ["target"],
 
       "generated": []
     }
