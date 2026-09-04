@@ -1,90 +1,56 @@
 {
-  "dart.lineLength": 80,
-  "editor.codeActionsOnSave": {
-    "source.organizeImports": "explicit",
-    "source.fixAll": "explicit"
-  },
-  "[dart]": {
-    "editor.formatOnSave": false,
-    "editor.codeActionsOnSave": {
-      "source.organizeImports": "always",
-      "source.fixAll": "always"
-    },
-    "editor.suggest.snippetsPreventQuickSuggestions": false,
-    "editor.selectionHighlight": false
-  },
-  "dart.analysisExcludedFolders": ["build", ".dart_tool"],
-  "dart.updateImportsOnRename": true,
-  "dart.completeFunctionCalls": true,
   // (Explorer)
   "files.exclude": {
-    "**/.dart_tool": true,
-    ".idea": true,
-    ".flutter-plugins-dependencies": true,
-    ".metadata": true,
-    "**/.kotlin": true,
-    "analysis_options.yaml": true,
-    "obywatel_app.iml": true,
-    "ios": true,
-    "linux": true,
-    "macos": true,
-    "web": true,
-    "windows": true,
-    "scripts/": true,
-    "test": true,
-    ".gitattributes": true,
-    "pubspec.lock": true,
-    "obywatel_app.code-workspace": true,
-    "LICENSE": true,
-    "devtools_options.yaml": true,
-    "flutter_launcher_icons.yaml": true,
-    "**/*.freezed.dart": true,
-    "**/*.g.dart": true,
-    "android": true,
-    "cnc_toolbox.iml": true,
-    "raw_assets/": true
-    // "combined.txt": true
+    "**/go.work.sum": true,
+    "**/go.sum": true,
+    // "**/go.mod": true,
+    "**/.gitattributes": true,
+    "**/.github": true,
+    // "**/.gitignore": true,
+    "**/bin/": true,
+    "**/README.md": true,
+    "**/LICENSE": true,
+    "**/SECURITY.md": true
   },
 
   // (Search)
   "search.exclude": {
-    ".dart_tool": true,
-    ".idea": true,
-    ".flutter-plugins-dependencies": true,
-    ".metadata": true,
-    "**/.kotlin": true,
-    "**/build": true,
-    "analysis_options.yaml": true,
-    "obywatel_app.iml": true,
-    "ios": true,
-    "linux": true,
-    "macos": true,
-    "web": true,
-    "windows": true,
-    "test": true,
-    "pubspec.lock": true,
-    "pubspec.yaml": true,
-    "README.md": true,
-    ".gitattributes": true,
-    ".gitignore": true,
-    "obywatel_app.code-workspace": true,
-    ".vscode": true,
-    "docs": true,
-    "android": true,
-    "LICENSE": true,
-    "devtools_options.yaml": true,
-    "flutter_launcher_icons.yaml": true,
-    "**/*.freezed.dart": true,
-    "**/*.g.dart": true,
-    "**/*.txt": true,
-    "cnc_toolbox.iml": true,
-    "raw_assets/": true,
-    "combined.txt": true
+    "**/go.work.sum": true,
+    "**/go.sum": true,
+    // "**/go.mod": true,
+    "**/bin/": true,
+    "**/backup/": true,
+    "**/README.md": true,
+    "**/LICENSE": true,
+    "**/SECURITY.md": true,
+    "**/.gitattributes": true,
+    "**/.gitignore": true
   },
-  "search.useIgnoreFiles": true,
-  "search.useGlobalIgnoreFiles": true,
-  "files.watcherExclude": {
-    "**/*.g.dart": true,
-    "**/*.freezed.dart": true
-  }
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "always"
+    },
+    "editor.defaultFormatter": "golang.go"
+  },
+  "go.formatTool": "gofumpt",
+  "go.lintTool": "golangci-lint",
+  "evenBetterToml.schema.enabled": false,
+  "go.lintOnSave": "package",
+  "editor.rulers": [120, 150],
+  "gopls": {
+    "ui.diagnostic.staticcheck": false,
+    "ui.navigation.importShortcut": "Definition",
+    "formatting.gofumpt": false,
+    "build.directoryFilters": [
+      "-**/node_modules",
+      "-**/.git",
+      "-**/dist",
+      "-**/bin",
+      "-**/tmp",
+      "-**/vendor",
+      "-**/docker"
+    ]
+  },
+  "go.vetOnSave": "off"
 }
