@@ -127,9 +127,7 @@ const DefaultProfilesConfig = `{
       },
 
       "extensions": [
-        ".go",
-        ".mod",
-        ".sum"
+        ".go"
       ],
 
       "ignore": [
