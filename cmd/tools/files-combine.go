@@ -155,6 +155,11 @@ func isAllowed(ext, name string, allowedExts []string, p *profiles.Profile) bool
 		return false
 	}
 
+	// Twarde zabezpieczenie dla plików generowanych w ekosystemie Flutter/Dart
+	if strings.HasSuffix(name, ".g.dart") || strings.HasSuffix(name, ".freezed.dart") {
+		return false
+	}
+
 	if p != nil && len(p.Generated) > 0 {
 		for _, gen := range p.Generated {
 			if strings.HasSuffix(name, gen) {
