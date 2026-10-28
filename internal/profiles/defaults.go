@@ -151,6 +151,22 @@ const DefaultProfilesConfig = `{
       "ignore": ["target"],
 
       "generated": []
+    },
+    {
+      "name": "nextjs",
+      "priority": 95,
+
+      "detect": {
+        "files": ["next.config.js", "next.config.ts", "next.config.mjs", "package.json"],
+        "folders": ["app", "pages", "components"],
+        "extensions": [".tsx", ".ts"]
+      },
+
+      "extensions": [".tsx", ".ts", ".js", ".jsx", ".css", ".scss", ".json"],
+
+      "ignore": [".next", "out", "coverage"],
+
+      "generated": []
     }
   ]
 }`
