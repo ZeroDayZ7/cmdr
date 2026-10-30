@@ -25,7 +25,6 @@ func NewTreeCmd() *cobra.Command {
 		Use:   "tree [path]",
 		Short: "Display a tree view of folders and files",
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			genIgnore, _ := cmd.Flags().GetBool("generate-ignore")
 			if genIgnore {
 				if err := tree.GenerateIgnoreFile(); err != nil {
@@ -87,8 +86,6 @@ func NewTreeCmd() *cobra.Command {
 	cmd.Flags().BoolP("generate-ignore", "g", false, "Generate .cmdrignore in your config folder")
 	cmd.Flags().StringVarP(&format, "format", "f", "ascii", "ascii|json|csv|md")
 	cmd.Flags().BoolVarP(&copyToClipboard, "copy", "c", false, "Copy to clipboard")
-
-	// Nowa opcja głębokości: domyślnie 0 lub ujemna oznacza brak limitu (wszystko)
 	cmd.Flags().IntVarP(&depth, "depth", "d", -1, "Max depth of the tree (0: current dir only, 1: current + 1 level, -1: all)")
 
 	return cmd

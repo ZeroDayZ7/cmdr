@@ -32,7 +32,7 @@ func NewPreparePasswordCmd() *cobra.Command {
 			}
 
 			// 2. Parsowanie do ogólnej structures
-			var content interface{}
+			var content any
 			if err := json.Unmarshal(data, &content); err != nil {
 				return fmt.Errorf("błąd parsowania JSON: %w", err)
 			}
@@ -70,12 +70,11 @@ func NewPreparePasswordCmd() *cobra.Command {
 }
 
 // processJSONNode przeszukuje strukturę JSON i zamienia pole "password"
-func processJSONNode(node interface{}, length int) (interface{}, error) {
+func processJSONNode(node any, length int) (any, error) {
 	switch v := node.(type) {
 	case map[string]any:
 		for key, val := range v {
 			if key == "password" {
-				// Generujemy nowe bezpieczne hasło z istniejącego modułu internal/crypto
 				newPass, err := crypto.GenerateRandomPassword(length)
 				if err != nil {
 					return nil, err

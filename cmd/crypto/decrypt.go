@@ -43,7 +43,6 @@ func newDecryptCmd() *cobra.Command {
 
 			if decryptFile != "" {
 				outPath := decryptOut + "/" + filepath.Base(decryptFile)
-				// usuń końcówkę .enc
 				if len(outPath) > 4 && outPath[len(outPath)-4:] == ".enc" {
 					outPath = outPath[:len(outPath)-4]
 				}
