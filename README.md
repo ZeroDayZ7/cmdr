@@ -16,6 +16,23 @@ cmdr --help
 
 ```
 
+## Asset Utilities
+
+The `assets` command groups image-processing helpers for generating favicon sets and resizing image files for web and application projects.
+
+```bash
+# Generate a default favicon set from a source image
+cmdr assets favicon --input ./logo.png --output ./generated
+
+# Resize an image to a fixed size and save it to a target path
+cmdr assets resize --input ./source.png --output ./out/resized.jpg --width 1200 --height 800 --fit cover
+
+# Initialize the default assets configuration file
+cmdr assets config init
+```
+
+For the detailed command reference, see [docs/assets.md](./docs/assets.md).
+
 ## Example Command: `ask`
 
 The `ask` command allows you to send a question to an API (e.g., Gemini API) and get an immediate response.

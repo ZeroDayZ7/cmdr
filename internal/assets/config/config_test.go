@@ -83,3 +83,35 @@ func TestLoadConfigInvalidJSON(t *testing.T) {
 		t.Fatal("expected invalid JSON error")
 	}
 }
+
+func TestLoadConfigExplicitFalseValuesAreKept(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "assets.json")
+	content := `{
+		"defaults": {
+			"output_dir": "generated",
+			"format": "png",
+			"overwrite": false
+		},
+		"presets": {
+			"favicon": {
+				"sizes": [16, 32, 48],
+				"format": "png",
+				"preserve_transparency": false
+			}
+		}
+	}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig returned error: %v", err)
+	}
+	if cfg.Defaults.Overwrite {
+		t.Fatal("expected explicit overwrite=false to remain false")
+	}
+	if cfg.Presets["favicon"].PreserveTransparency {
+		t.Fatal("expected explicit preserve_transparency=false to remain false")
+	}
+}

@@ -51,8 +51,15 @@ func NewFaviconCmd() *cobra.Command {
 					finalSizes = favicon.DefaultSizes()
 				}
 			}
+			if !overwrite && cfg.Defaults.Overwrite {
+				overwrite = true
+			}
+			preserveTransparency := true
+			if preset, ok := cfg.Presets["favicon"]; ok {
+				preserveTransparency = preset.PreserveTransparency
+			}
 
-			files, err := favicon.GenerateFaviconSet(inputPath, outputDir, finalSizes, overwrite)
+			files, err := favicon.GenerateFaviconSetWithOptions(inputPath, outputDir, finalSizes, overwrite, preserveTransparency)
 			if err != nil {
 				return err
 			}

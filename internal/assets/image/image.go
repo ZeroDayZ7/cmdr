@@ -104,15 +104,12 @@ func NormalizeOutputFormat(path, format string) (string, error) {
 	if !IsSupportedOutputFormat(format) {
 		return "", fmt.Errorf("unsupported output format %q", format)
 	}
-	pathExt := strings.ToLower(filepath.Ext(path))
-	if pathExt == ".png" && format != "png" {
-		return "", fmt.Errorf("output path %s indicates PNG, but format %q was requested", path, format)
+	pathFormat, err := OutputFormatFromPath(path)
+	if err != nil {
+		return "", err
 	}
-	if (pathExt == ".jpg" || pathExt == ".jpeg") && format != "jpeg" {
-		return "", fmt.Errorf("output path %s indicates JPEG, but format %q was requested", path, format)
-	}
-	if pathExt == ".gif" && format != "gif" {
-		return "", fmt.Errorf("output path %s indicates GIF, but format %q was requested", path, format)
+	if pathFormat != format {
+		return "", fmt.Errorf("output path %s indicates %s, but format %q was requested", path, pathFormat, format)
 	}
 	return format, nil
 }
@@ -124,22 +121,29 @@ func EncodeImage(path string, img image.Image, format string, overwrite bool) er
 	if img == nil {
 		return errors.New("image is nil")
 	}
-	if width, height := img.Bounds().Dx(), img.Bounds().Dy(); width <= 0 || height <= 0 {
+	width, height := img.Bounds().Dx(), img.Bounds().Dy()
+	if width <= 0 || height <= 0 {
 		return fmt.Errorf("image has invalid dimensions %dx%d", width, height)
 	}
-	if width, height := img.Bounds().Dx(), img.Bounds().Dy(); width > maxImageDimension || height > maxImageDimension {
+	if width > maxImageDimension || height > maxImageDimension {
 		return fmt.Errorf("output image exceeds max allowed dimensions %dx%d", width, height)
+	}
+	if uint64(width)*uint64(height) > maxPixelCount {
+		return fmt.Errorf("output image exceeds max pixel count %d", maxPixelCount)
 	}
 
 	resolvedFormat, err := NormalizeOutputFormat(path, format)
 	if err != nil {
 		return err
 	}
-	if info, err := os.Stat(path); err == nil && !info.Mode().IsRegular() {
-		return fmt.Errorf("output path is not a regular file: %s", path)
-	} else if err == nil && !overwrite {
-		return fmt.Errorf("output file already exists: %s", path)
-	} else if err != nil && !os.IsNotExist(err) {
+	if info, err := os.Stat(path); err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("output path is a directory: %s", path)
+		}
+		if !overwrite {
+			return fmt.Errorf("output file already exists: %s", path)
+		}
+	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("check output file %s: %w", path, err)
 	}
 
@@ -193,16 +197,22 @@ func ResizeWithFit(img image.Image, targetW, targetH int, fit string) (image.Ima
 	if srcW > maxImageDimension || srcH > maxImageDimension {
 		return nil, fmt.Errorf("source image exceeds max allowed dimensions %dx%d", srcW, srcH)
 	}
+	if uint64(srcW)*uint64(srcH) > maxPixelCount {
+		return nil, fmt.Errorf("source image exceeds max pixel count %d", maxPixelCount)
+	}
 
 	fit = strings.ToLower(strings.TrimSpace(fit))
 	if fit == "" {
 		fit = "contain"
 	}
-
-	out := image.NewNRGBA(image.Rect(0, 0, targetW, targetH))
 	if targetW > maxImageDimension || targetH > maxImageDimension {
 		return nil, fmt.Errorf("target image exceeds max allowed dimensions %dx%d", targetW, targetH)
 	}
+	if uint64(targetW)*uint64(targetH) > maxPixelCount {
+		return nil, fmt.Errorf("target image exceeds max pixel count %d", maxPixelCount)
+	}
+
+	out := image.NewNRGBA(image.Rect(0, 0, targetW, targetH))
 
 	switch fit {
 	case "stretch":
@@ -259,7 +269,7 @@ func hasAlpha(img image.Image) bool {
 	return false
 }
 
-func compositeOnWhite(img image.Image) image.Image {
+func CompositeOnWhite(img image.Image) image.Image {
 	bounds := img.Bounds()
 	out := image.NewRGBA(bounds)
 	draw.Draw(out, bounds, &image.Uniform{C: color.White}, image.Point{}, draw.Src)
@@ -267,28 +277,58 @@ func compositeOnWhite(img image.Image) image.Image {
 	return out
 }
 
+func compositeOnWhite(img image.Image) image.Image {
+	return CompositeOnWhite(img)
+}
+
 func ReplaceFile(src, dst string, overwrite bool) error {
 	if src == "" || dst == "" {
 		return errors.New("source and destination paths are required")
 	}
-	if _, err := os.Stat(dst); err == nil && !overwrite {
-		return fmt.Errorf("file already exists: %s", dst)
+	if src == dst {
+		return errors.New("source and destination paths must be different")
 	}
-	if err := os.Rename(src, dst); err == nil {
+	if info, err := os.Stat(dst); err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("destination path is a directory: %s", dst)
+		}
+		if !overwrite {
+			return fmt.Errorf("file already exists: %s", dst)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check destination file %s: %w", dst, err)
+	}
+	if info, err := os.Stat(src); err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("source path is a directory: %s", src)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check source file %s: %w", src, err)
+	}
+
+	renameErr := os.Rename(src, dst)
+	if renameErr == nil {
 		return nil
 	}
-	if err := os.Remove(dst); err == nil || os.IsNotExist(err) {
-		if err := os.Rename(src, dst); err == nil {
-			return nil
-		}
+	moveErr := windowsMoveFileEx(src, dst, overwrite)
+	if moveErr == nil {
+		return nil
 	}
-	if os.Getenv("OS") == "Windows_NT" {
-		srcPtr, _ := windows.UTF16PtrFromString(src)
-		dstPtr, _ := windows.UTF16PtrFromString(dst)
-		flags := uint32(windows.MOVEFILE_REPLACE_EXISTING | windows.MOVEFILE_WRITE_THROUGH)
-		if err := windows.MoveFileEx(srcPtr, dstPtr, flags); err == nil {
-			return nil
-		}
+	return fmt.Errorf("replace file %s with %s: rename failed: %w; MoveFileEx failed: %v", src, dst, renameErr, moveErr)
+}
+
+func windowsMoveFileEx(src, dst string, overwrite bool) error {
+	srcPtr, err := windows.UTF16PtrFromString(src)
+	if err != nil {
+		return fmt.Errorf("convert source path %s to UTF-16: %w", src, err)
 	}
-	return fmt.Errorf("replace file %s with %s", src, dst)
+	dstPtr, err := windows.UTF16PtrFromString(dst)
+	if err != nil {
+		return fmt.Errorf("convert destination path %s to UTF-16: %w", dst, err)
+	}
+	flags := uint32(windows.MOVEFILE_WRITE_THROUGH)
+	if overwrite {
+		flags |= windows.MOVEFILE_REPLACE_EXISTING
+	}
+	return windows.MoveFileEx(srcPtr, dstPtr, flags)
 }

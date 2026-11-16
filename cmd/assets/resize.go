@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	assetconfig "github.com/zerodayz7/cmdr/internal/assets/config"
 	assetresize "github.com/zerodayz7/cmdr/internal/assets/resize"
 )
 
@@ -30,6 +31,13 @@ func NewResizeCmd() *cobra.Command {
 			}
 			if _, err := os.Stat(inputPath); err != nil {
 				return fmt.Errorf("source image %s does not exist: %w", inputPath, err)
+			}
+			cfg, err := assetconfig.LoadConfig("")
+			if err != nil {
+				return fmt.Errorf("load asset config: %w", err)
+			}
+			if !overwrite && cfg.Defaults.Overwrite {
+				overwrite = true
 			}
 			if width <= 0 || height <= 0 {
 				return fmt.Errorf("--width/-w and --height/-H must be positive integers")

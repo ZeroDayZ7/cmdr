@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/sys/windows"
+	assetimage "github.com/zerodayz7/cmdr/internal/assets/image"
 )
 
 const defaultAssetsConfigJSON = `{
@@ -108,22 +108,25 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	if defaultsRaw, ok := raw["defaults"]; ok {
-		var defaults Defaults
-		if err := json.Unmarshal(defaultsRaw, &defaults); err != nil {
+		defaults, err := mergeDefaults(defaultsRaw, cfg.Defaults)
+		if err != nil {
 			return nil, fmt.Errorf("invalid defaults in %s: %w", configPath, err)
 		}
-		cfg.Defaults = applyDefaults(defaults, cfg.Defaults)
+		cfg.Defaults = defaults
 	}
 
 	if presetsRaw, ok := raw["presets"]; ok {
-		var presets map[string]Preset
+		var presets map[string]json.RawMessage
 		if err := json.Unmarshal(presetsRaw, &presets); err != nil {
 			return nil, fmt.Errorf("invalid presets in %s: %w", configPath, err)
 		}
 		cfg.Presets = map[string]Preset{}
-		for name, preset := range presets {
-			filled := applyPresetDefaults(preset, DefaultConfig().Presets["favicon"])
-			validated, err := validatePreset(name, filled)
+		for name, presetRaw := range presets {
+			preset, err := mergePreset(presetRaw, DefaultConfig().Presets["favicon"])
+			if err != nil {
+				return nil, fmt.Errorf("invalid preset %q in %s: %w", name, configPath, err)
+			}
+			validated, err := validatePreset(name, preset)
 			if err != nil {
 				return nil, fmt.Errorf("invalid preset %q in %s: %w", name, configPath, err)
 			}
@@ -153,7 +156,7 @@ func InitConfig(path string, overwrite bool) error {
 		if !overwrite {
 			return fmt.Errorf("configuration already exists at %s; use --force to overwrite", configPath)
 		}
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("check asset config at %s: %w", configPath, err)
 	}
 
@@ -163,28 +166,58 @@ func InitConfig(path string, overwrite bool) error {
 	return writeFileAtomically(configPath, []byte(defaultAssetsConfigJSON), overwrite)
 }
 
-func applyDefaults(in Defaults, def Defaults) Defaults {
-	if in.OutputDir == "" {
-		in.OutputDir = def.OutputDir
+func mergeDefaults(raw json.RawMessage, def Defaults) (Defaults, error) {
+	result := def
+	if len(raw) == 0 || string(raw) == "null" {
+		return result, nil
 	}
-	if in.Format == "" {
-		in.Format = def.Format
+	var val map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &val); err != nil {
+		return Defaults{}, err
 	}
-	in.Overwrite = in.Overwrite || def.Overwrite
-	return in
+	if rawValue, ok := val["output_dir"]; ok {
+		if err := json.Unmarshal(rawValue, &result.OutputDir); err != nil {
+			return Defaults{}, err
+		}
+	}
+	if rawValue, ok := val["format"]; ok {
+		if err := json.Unmarshal(rawValue, &result.Format); err != nil {
+			return Defaults{}, err
+		}
+	}
+	if rawValue, ok := val["overwrite"]; ok {
+		if err := json.Unmarshal(rawValue, &result.Overwrite); err != nil {
+			return Defaults{}, err
+		}
+	}
+	return result, nil
 }
 
-func applyPresetDefaults(in Preset, def Preset) Preset {
-	if in.Format == "" {
-		in.Format = def.Format
+func mergePreset(raw json.RawMessage, def Preset) (Preset, error) {
+	result := def
+	if len(raw) == 0 || string(raw) == "null" {
+		return result, nil
 	}
-	if len(in.Sizes) == 0 {
-		in.Sizes = append([]int(nil), def.Sizes...)
+	var val map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &val); err != nil {
+		return Preset{}, err
 	}
-	if in.PreserveTransparency == false && def.PreserveTransparency {
-		in.PreserveTransparency = true
+	if rawValue, ok := val["sizes"]; ok {
+		if err := json.Unmarshal(rawValue, &result.Sizes); err != nil {
+			return Preset{}, err
+		}
 	}
-	return in
+	if rawValue, ok := val["format"]; ok {
+		if err := json.Unmarshal(rawValue, &result.Format); err != nil {
+			return Preset{}, err
+		}
+	}
+	if rawValue, ok := val["preserve_transparency"]; ok {
+		if err := json.Unmarshal(rawValue, &result.PreserveTransparency); err != nil {
+			return Preset{}, err
+		}
+	}
+	return result, nil
 }
 
 func validateConfig(cfg *Config) error {
@@ -262,41 +295,9 @@ func writeFileAtomically(path string, data []byte, overwrite bool) error {
 		os.Remove(tmpPath)
 		return fmt.Errorf("close temporary config for %s: %w", path, err)
 	}
-	if err := replaceFile(tmpPath, path, overwrite); err != nil {
+	if err := assetimage.ReplaceFile(tmpPath, path, overwrite); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("replace config at %s: %w", path, err)
 	}
 	return nil
-}
-
-func replaceFile(src, dst string, overwrite bool) error {
-	if !overwrite {
-		if _, err := os.Stat(dst); err == nil {
-			return fmt.Errorf("file already exists: %s", dst)
-		}
-	}
-	if err := os.Rename(src, dst); err == nil {
-		return nil
-	}
-	if err := os.Remove(dst); err == nil || os.IsNotExist(err) {
-		if err := os.Rename(src, dst); err == nil {
-			return nil
-		}
-	}
-	if err := windowsMoveFileEx(src, dst); err == nil {
-		return nil
-	}
-	return fmt.Errorf("replace file %s with %s: %w", src, dst, os.ErrExist)
-}
-
-func windowsMoveFileEx(src, dst string) error {
-	srcPtr, err := windows.UTF16PtrFromString(src)
-	if err != nil {
-		return err
-	}
-	dstPtr, err := windows.UTF16PtrFromString(dst)
-	if err != nil {
-		return err
-	}
-	return windows.MoveFileEx(srcPtr, dstPtr, windows.MOVEFILE_REPLACE_EXISTING|windows.MOVEFILE_WRITE_THROUGH)
 }

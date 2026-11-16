@@ -36,9 +36,14 @@ func ResizeImage(srcPath, dstPath string, width, height int, fit string, overwri
 		return err
 	}
 
-	if _, err := os.Stat(dstPath); err == nil && !overwrite {
-		return fmt.Errorf("output file already exists: %s", dstPath)
-	} else if err != nil && !os.IsNotExist(err) {
+	if info, err := os.Stat(dstPath); err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("output path is a directory: %s", dstPath)
+		}
+		if !overwrite {
+			return fmt.Errorf("output file already exists: %s", dstPath)
+		}
+	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("check output file %s: %w", dstPath, err)
 	}
 
@@ -70,17 +75,27 @@ func sameFilePath(pathA, pathB string) (bool, error) {
 
 	if resolvedA, err := filepath.EvalSymlinks(baseA); err == nil {
 		baseA = resolvedA
+	} else if !os.IsNotExist(err) {
+		return false, err
 	}
 	if resolvedB, err := filepath.EvalSymlinks(baseB); err == nil {
 		baseB = resolvedB
+	} else if !os.IsNotExist(err) {
+		return false, err
 	}
 
-	if strings.EqualFold(baseA, baseB) {
+	if strings.EqualFold(filepath.Clean(baseA), filepath.Clean(baseB)) {
 		return true, nil
 	}
 
 	infoA, errA := os.Stat(baseA)
+	if errA != nil && !os.IsNotExist(errA) {
+		return false, errA
+	}
 	infoB, errB := os.Stat(baseB)
+	if errB != nil && !os.IsNotExist(errB) {
+		return false, errB
+	}
 	if errA == nil && errB == nil {
 		return os.SameFile(infoA, infoB), nil
 	}
