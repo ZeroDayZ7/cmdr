@@ -1,10 +1,11 @@
 module github.com/zerodayz7/cmdr
 
-go 1.25.0
+go 1.27.0
 
 require (
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.55.0
+	golang.org/x/image v0.27.0
 )
 
 require (

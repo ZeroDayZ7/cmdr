@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/zerodayz7/cmdr/cmd/assets"
 	"github.com/zerodayz7/cmdr/cmd/bootstrap"
 	"github.com/zerodayz7/cmdr/cmd/crypto"
 	"github.com/zerodayz7/cmdr/cmd/general"
@@ -37,6 +38,7 @@ func Execute() {
 // #region init
 func init() {
 	rootCmd.AddCommand(
+		assets.NewAssetsCmd(),
 		bootstrap.NewBootstrapCmd(),
 		crypto.NewCmd(),               // crypto
 		general.NewHelloCmd(l),        // hello
