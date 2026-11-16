@@ -20,6 +20,7 @@ func NewFaviconCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "favicon",
 		Short: "Generate a favicon set from a single source image",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(inputPath) == "" {
 				return fmt.Errorf("--input/-i is required")
@@ -38,12 +39,16 @@ func NewFaviconCmd() *cobra.Command {
 			if strings.TrimSpace(outputDir) == "" {
 				outputDir = "generated"
 			}
-			finalSizes := parseSizes(sizesFlag)
+
+			finalSizes, err := parseSizes(sizesFlag)
+			if err != nil {
+				return err
+			}
 			if len(finalSizes) == 0 {
 				if preset, ok := cfg.Presets["favicon"]; ok && len(preset.Sizes) > 0 {
 					finalSizes = preset.Sizes
 				} else {
-					finalSizes = favicon.DefaultSizes
+					finalSizes = favicon.DefaultSizes()
 				}
 			}
 
@@ -52,7 +57,7 @@ func NewFaviconCmd() *cobra.Command {
 				return err
 			}
 			for _, name := range files {
-				fmt.Printf("Created: %s\n", name)
+				cmd.Printf("Created: %s\n", name)
 			}
 			return nil
 		},
@@ -65,22 +70,31 @@ func NewFaviconCmd() *cobra.Command {
 	return cmd
 }
 
-func parseSizes(raw string) []int {
+func parseSizes(raw string) ([]int, error) {
 	if strings.TrimSpace(raw) == "" {
-		return nil
+		return nil, nil
 	}
 	parts := strings.Split(raw, ",")
 	result := make([]int, 0, len(parts))
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(part)
 		if trimmed == "" {
-			continue
+			return nil, fmt.Errorf("invalid favicon size value: empty item")
 		}
 		value, err := strconv.Atoi(trimmed)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("invalid favicon size value %q: %w", trimmed, err)
+		}
+		if value <= 0 {
+			return nil, fmt.Errorf("invalid favicon size value %q: expected a positive integer", trimmed)
+		}
+		if value > 2048 {
+			return nil, fmt.Errorf("invalid favicon size value %q: exceeds supported maximum 2048", trimmed)
 		}
 		result = append(result, value)
 	}
-	return result
+	if len(result) == 0 {
+		return nil, fmt.Errorf("favicon sizes list is empty")
+	}
+	return result, nil
 }

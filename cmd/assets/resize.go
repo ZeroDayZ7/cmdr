@@ -20,6 +20,7 @@ func NewResizeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "resize",
 		Short: "Resize a source image while keeping aspect ratio or stretching it",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(inputPath) == "" {
 				return fmt.Errorf("--input/-i is required")
@@ -31,7 +32,7 @@ func NewResizeCmd() *cobra.Command {
 				return fmt.Errorf("source image %s does not exist: %w", inputPath, err)
 			}
 			if width <= 0 || height <= 0 {
-				return fmt.Errorf("--width/-w and --height/-h must be positive integers")
+				return fmt.Errorf("--width/-w and --height/-H must be positive integers")
 			}
 			if fit == "" {
 				fit = "contain"
@@ -44,7 +45,7 @@ func NewResizeCmd() *cobra.Command {
 			if err := assetresize.ResizeImage(inputPath, outputPath, width, height, fit, overwrite); err != nil {
 				return err
 			}
-			fmt.Printf("Resized image saved to: %s\n", outputPath)
+			cmd.Printf("Resized image saved to: %s\n", outputPath)
 			return nil
 		},
 	}

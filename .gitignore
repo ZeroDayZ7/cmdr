@@ -27,5 +27,3 @@ go.work.sum
 .env
 **/combined.txt
 **/temp.md
-**/*.patch
-**/*.patchgit

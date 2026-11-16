@@ -5,15 +5,23 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/image/draw"
+	xdraw "golang.org/x/image/draw"
+	"golang.org/x/sys/windows"
+)
+
+const (
+	maxImageDimension = 16384
+	maxPixelCount     = 268435456
 )
 
 func DecodeImage(path string) (image.Image, string, error) {
@@ -34,6 +42,23 @@ func DecodeImage(path string) (image.Image, string, error) {
 		return nil, "", fmt.Errorf("open source image %s: %w", path, err)
 	}
 	defer f.Close()
+
+	cfg, format, err := image.DecodeConfig(f)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid image file %s: %w", path, err)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		return nil, "", fmt.Errorf("image %s has invalid dimensions %dx%d", path, cfg.Width, cfg.Height)
+	}
+	if cfg.Width > maxImageDimension || cfg.Height > maxImageDimension {
+		return nil, "", fmt.Errorf("image %s exceeds max allowed dimensions %dx%d", path, cfg.Width, cfg.Height)
+	}
+	if uint64(cfg.Width)*uint64(cfg.Height) > maxPixelCount {
+		return nil, "", fmt.Errorf("image %s exceeds max pixel count %d", path, maxPixelCount)
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, "", fmt.Errorf("reset image reader for %s: %w", path, err)
+	}
 
 	img, format, err := image.Decode(f)
 	if err != nil {
@@ -68,6 +93,30 @@ func OutputFormatFromPath(path string) (string, error) {
 	}
 }
 
+func NormalizeOutputFormat(path, format string) (string, error) {
+	if strings.TrimSpace(format) == "" {
+		return OutputFormatFromPath(path)
+	}
+	format = strings.ToLower(strings.TrimSpace(format))
+	if format == "jpg" {
+		format = "jpeg"
+	}
+	if !IsSupportedOutputFormat(format) {
+		return "", fmt.Errorf("unsupported output format %q", format)
+	}
+	pathExt := strings.ToLower(filepath.Ext(path))
+	if pathExt == ".png" && format != "png" {
+		return "", fmt.Errorf("output path %s indicates PNG, but format %q was requested", path, format)
+	}
+	if (pathExt == ".jpg" || pathExt == ".jpeg") && format != "jpeg" {
+		return "", fmt.Errorf("output path %s indicates JPEG, but format %q was requested", path, format)
+	}
+	if pathExt == ".gif" && format != "gif" {
+		return "", fmt.Errorf("output path %s indicates GIF, but format %q was requested", path, format)
+	}
+	return format, nil
+}
+
 func EncodeImage(path string, img image.Image, format string, overwrite bool) error {
 	if path == "" {
 		return errors.New("output path is empty")
@@ -78,56 +127,51 @@ func EncodeImage(path string, img image.Image, format string, overwrite bool) er
 	if width, height := img.Bounds().Dx(), img.Bounds().Dy(); width <= 0 || height <= 0 {
 		return fmt.Errorf("image has invalid dimensions %dx%d", width, height)
 	}
-	if format == "" {
-		resolved, err := OutputFormatFromPath(path)
-		if err != nil {
-			return err
-		}
-		format = resolved
+	if width, height := img.Bounds().Dx(), img.Bounds().Dy(); width > maxImageDimension || height > maxImageDimension {
+		return fmt.Errorf("output image exceeds max allowed dimensions %dx%d", width, height)
 	}
-	if !IsSupportedOutputFormat(format) {
-		return fmt.Errorf("unsupported output format %q", format)
+
+	resolvedFormat, err := NormalizeOutputFormat(path, format)
+	if err != nil {
+		return err
 	}
 	if info, err := os.Stat(path); err == nil && !info.Mode().IsRegular() {
 		return fmt.Errorf("output path is not a regular file: %s", path)
 	} else if err == nil && !overwrite {
 		return fmt.Errorf("output file already exists: %s", path)
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("check output file %s: %w", path, err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create output directory for %s: %w", path, err)
 	}
 
-	if _, err := os.Stat(path); err == nil && overwrite {
-		if err := os.Remove(path); err != nil {
-			return fmt.Errorf("remove existing file %s before overwrite: %w", path, err)
-		}
-	}
-
-	tmpFile, err := os.CreateTemp(filepath.Dir(path), "*.tmp")
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), "cmdr-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create temporary output file for %s: %w", path, err)
 	}
-	cleanupPath := tmpFile.Name()
-	defer os.Remove(cleanupPath)
-
-	if err := func() error {
-		defer tmpFile.Close()
-		switch format {
-		case "png":
-			return png.Encode(tmpFile, img)
-		case "jpg", "jpeg":
-			return jpeg.Encode(tmpFile, img, &jpeg.Options{Quality: 90})
-		case "gif":
-			return gif.Encode(tmpFile, img, nil)
-		default:
-			return fmt.Errorf("unsupported output format %q", format)
-		}
-	}(); err != nil {
-		return fmt.Errorf("encode image %s: %w", path, err)
+	tmpPath := tmpFile.Name()
+	cleanup := func() {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 	}
 
-	if err := os.Rename(cleanupPath, path); err != nil {
+	imgToEncode := img
+	if resolvedFormat == "jpeg" && hasAlpha(img) {
+		imgToEncode = compositeOnWhite(img)
+	}
+
+	if err := encodeImage(tmpFile, imgToEncode, resolvedFormat); err != nil {
+		cleanup()
+		return fmt.Errorf("encode image %s: %w", path, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("close temporary output file for %s: %w", path, err)
+	}
+	if err := ReplaceFile(tmpPath, path, overwrite); err != nil {
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("save output image %s: %w", path, err)
 	}
 	return nil
@@ -146,6 +190,9 @@ func ResizeWithFit(img image.Image, targetW, targetH int, fit string) (image.Ima
 	if srcW <= 0 || srcH <= 0 {
 		return nil, fmt.Errorf("source image has invalid dimensions %dx%d", srcW, srcH)
 	}
+	if srcW > maxImageDimension || srcH > maxImageDimension {
+		return nil, fmt.Errorf("source image exceeds max allowed dimensions %dx%d", srcW, srcH)
+	}
 
 	fit = strings.ToLower(strings.TrimSpace(fit))
 	if fit == "" {
@@ -153,10 +200,8 @@ func ResizeWithFit(img image.Image, targetW, targetH int, fit string) (image.Ima
 	}
 
 	out := image.NewNRGBA(image.Rect(0, 0, targetW, targetH))
-	for x := 0; x < targetW; x++ {
-		for y := 0; y < targetH; y++ {
-			out.Set(x, y, color.NRGBA{R: 0, G: 0, B: 0, A: 0})
-		}
+	if targetW > maxImageDimension || targetH > maxImageDimension {
+		return nil, fmt.Errorf("target image exceeds max allowed dimensions %dx%d", targetW, targetH)
 	}
 
 	switch fit {
@@ -168,7 +213,7 @@ func ResizeWithFit(img image.Image, targetW, targetH int, fit string) (image.Ima
 		newH := int(math.Round(float64(srcH) * scale))
 		offsetX := (targetW - newW) / 2
 		offsetY := (targetH - newH) / 2
-		draw.CatmullRom.Scale(out, image.Rect(offsetX, offsetY, offsetX+newW, offsetY+newH), img, img.Bounds(), draw.Over, nil)
+		xdraw.CatmullRom.Scale(out, image.Rect(offsetX, offsetY, offsetX+newW, offsetY+newH), img, img.Bounds(), draw.Over, nil)
 		return out, nil
 	case "cover":
 		scale := math.Max(float64(targetW)/float64(srcW), float64(targetH)/float64(srcH))
@@ -176,7 +221,7 @@ func ResizeWithFit(img image.Image, targetW, targetH int, fit string) (image.Ima
 		newH := int(math.Round(float64(srcH) * scale))
 		offsetX := (targetW - newW) / 2
 		offsetY := (targetH - newH) / 2
-		draw.CatmullRom.Scale(out, image.Rect(offsetX, offsetY, offsetX+newW, offsetY+newH), img, img.Bounds(), draw.Over, nil)
+		xdraw.CatmullRom.Scale(out, image.Rect(offsetX, offsetY, offsetX+newW, offsetY+newH), img, img.Bounds(), draw.Over, nil)
 		return out, nil
 	default:
 		return nil, fmt.Errorf("unsupported resize fit mode %q: expected contain, cover, or stretch", fit)
@@ -185,6 +230,65 @@ func ResizeWithFit(img image.Image, targetW, targetH int, fit string) (image.Ima
 
 func scaleImage(img image.Image, targetW, targetH int) image.Image {
 	out := image.NewNRGBA(image.Rect(0, 0, targetW, targetH))
-	draw.CatmullRom.Scale(out, out.Bounds(), img, img.Bounds(), draw.Over, nil)
+	xdraw.CatmullRom.Scale(out, out.Bounds(), img, img.Bounds(), draw.Over, nil)
 	return out
+}
+
+func encodeImage(w io.Writer, img image.Image, format string) error {
+	switch format {
+	case "png":
+		return png.Encode(w, img)
+	case "jpeg":
+		return jpeg.Encode(w, img, &jpeg.Options{Quality: 90})
+	case "gif":
+		return gif.Encode(w, img, nil)
+	default:
+		return fmt.Errorf("unsupported output format %q", format)
+	}
+}
+
+func hasAlpha(img image.Image) bool {
+	bounds := img.Bounds()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			if rgba := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA); rgba.A != 255 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func compositeOnWhite(img image.Image) image.Image {
+	bounds := img.Bounds()
+	out := image.NewRGBA(bounds)
+	draw.Draw(out, bounds, &image.Uniform{C: color.White}, image.Point{}, draw.Src)
+	draw.Draw(out, bounds, img, bounds.Min, draw.Over)
+	return out
+}
+
+func ReplaceFile(src, dst string, overwrite bool) error {
+	if src == "" || dst == "" {
+		return errors.New("source and destination paths are required")
+	}
+	if _, err := os.Stat(dst); err == nil && !overwrite {
+		return fmt.Errorf("file already exists: %s", dst)
+	}
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+	if err := os.Remove(dst); err == nil || os.IsNotExist(err) {
+		if err := os.Rename(src, dst); err == nil {
+			return nil
+		}
+	}
+	if os.Getenv("OS") == "Windows_NT" {
+		srcPtr, _ := windows.UTF16PtrFromString(src)
+		dstPtr, _ := windows.UTF16PtrFromString(dst)
+		flags := uint32(windows.MOVEFILE_REPLACE_EXISTING | windows.MOVEFILE_WRITE_THROUGH)
+		if err := windows.MoveFileEx(srcPtr, dstPtr, flags); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("replace file %s with %s", src, dst)
 }
