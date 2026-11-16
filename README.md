@@ -5,6 +5,9 @@ A fast, developer-friendly CLI for bootstrapping microservices and handy Go tool
 ## Table of Contents
 
 - [Project Profiles (Smart Detection)](./docs/PROFILES_GUIDE.md)
+- [Prepare Password](./docs/PREPARE-PASSWORD.md)
+- [Tree Usage](./docs/TREE_USAGE.md)
+- [Assets](./docs/assets.md)
 
 ## Usage
 
@@ -93,6 +96,7 @@ Usage:
   cmdr [command]
 
 Available Commands:
+  assets          Image utilities: generate favicon sets and resize images
   ask             Ask questions to an API and get the answer
   clear           Deletes all directories with the given name in the current project
   completion      Generate the autocompletion script for the specified shell
