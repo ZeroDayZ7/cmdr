@@ -104,7 +104,8 @@ jobs:
           $versionJson | ConvertTo-Json -Depth 10 | Set-Content -NoNewline build/windows/versioninfo.json
           $assemblyVersion = "$major.$minor.$patch.0"
           $manifest = Get-Content -Raw build/windows/manifest.xml
-          $manifest = $manifest -replace '(<assemblyIdentity[^>]*\bversion=")[^"]*(")', '${1}' + $assemblyVersion + '${2}'
+          $replacement = '${1}' + $assemblyVersion + '${2}'
+          $manifest = $manifest -replace '(<assemblyIdentity[^>]*\bversion=")[^"]*(")', $replacement
           Set-Content -NoNewline build/windows/manifest.xml $manifest
           goversioninfo.exe -64 -icon build/windows/icon.ico -manifest build/windows/manifest.xml -o resource_windows_amd64.syso -propagate-ver-strings build/windows/versioninfo.json
           if ($LASTEXITCODE -ne 0) { throw "goversioninfo failed" }

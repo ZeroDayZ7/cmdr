@@ -2,6 +2,7 @@ package updater
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -43,4 +44,18 @@ func ParseReleaseTagForTest(tag string) string {
 		return tag[1:]
 	}
 	return tag
+}
+
+func TestAssemblyIdentityNumericCore(t *testing.T) {
+	for _, full := range []string{"2.1.6", "2.1.6-rc.2"} {
+		core := strings.SplitN(full, "-", 2)[0]
+		parts := strings.Split(core, ".")
+		if len(parts) != 3 {
+			t.Fatalf("invalid core: %s", core)
+		}
+		assembly := strings.Join(parts, ".") + ".0"
+		if assembly != "2.1.6.0" {
+			t.Fatalf("full version %s produced assembly %s", full, assembly)
+		}
+	}
 }
