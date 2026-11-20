@@ -101,12 +101,14 @@ jobs:
             $field.Patch = $patch
             $field.Build = 0
           }
-          $versionJson | ConvertTo-Json -Depth 10 | Set-Content -NoNewline build/windows/versioninfo.json
+          $versionJsonText = $versionJson | ConvertTo-Json -Depth 10
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText((Resolve-Path build/windows/versioninfo.json).Path, $versionJsonText, $utf8NoBom)
           $assemblyVersion = "$major.$minor.$patch.0"
           $manifest = Get-Content -Raw build/windows/manifest.xml
           $replacement = '${1}' + $assemblyVersion + '${2}'
           $manifest = $manifest -replace '(<assemblyIdentity[^>]*\bversion=")[^"]*(")', $replacement
-          Set-Content -NoNewline build/windows/manifest.xml $manifest
+          [System.IO.File]::WriteAllText((Resolve-Path build/windows/manifest.xml).Path, $manifest, $utf8NoBom)
           goversioninfo.exe -64 -icon build/windows/icon.ico -manifest build/windows/manifest.xml -o resource_windows_amd64.syso -propagate-ver-strings build/windows/versioninfo.json
           if ($LASTEXITCODE -ne 0) { throw "goversioninfo failed" }
           $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=$env:RELEASE_VERSION -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
