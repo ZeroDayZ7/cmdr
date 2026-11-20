@@ -159,3 +159,17 @@ Running `cmdr` without arguments, `cmdr help`, or `cmdr --help` displays a compa
 ```
 
 The banner uses the version from `config/metadata.go`. ANSI colors are disabled with `NO_COLOR`, when stdout is redirected or piped, and when the terminal environment is not detected as color-capable. Regular commands and subcommand help do not show the root banner.
+
+## Version and diagnostics
+
+```bash
+cmdr version
+cmdr version --short
+cmdr version --json
+
+cmdr doctor
+cmdr doctor --verbose
+cmdr doctor --json
+```
+
+`cmdr doctor` reports executable, configuration, permissions, GitHub API, and updater readiness. `OK` is passed, `WARN` is non-blocking, and `FAIL` requires attention. Warnings keep a zero exit code; failures return a non-zero exit code.
