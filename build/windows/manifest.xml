@@ -3,7 +3,7 @@
   <assemblyIdentity
     type="win32"
     name="cmdr"
-    version="2.1.5.0"
+    version="2.1.6.0"
     processorArchitecture="*"
     publicKeyToken=""
   />
