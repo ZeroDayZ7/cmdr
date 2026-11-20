@@ -30,6 +30,9 @@ func TestCompareVersions(t *testing.T) {
 		{"2.1.4", "2.1.5", -1},
 		{"2.1.5", "2.1.5", 0},
 		{"2.1.5", "2.1.5-beta.1", 1},
+		{"2.1.6-rc.2", "2.1.6-rc.10", -1},
+		{"2.1.6", "2.1.6-rc.2", 1},
+		{"2.1.6-beta.1", "2.1.6-alpha.9", 1},
 	} {
 		got, err := CompareVersions(tc.a, tc.b)
 		if err != nil {

@@ -34,7 +34,29 @@ git push origin main
 git push origin v2.1.5
 ```
 
-Do not push a tag or publish a release without approval. The workflow only accepts `vMAJOR.MINOR.PATCH`, rejects `v.1.0.1`, runs tests, builds Windows amd64 and Linux amd64, creates archives, generates `checksums.txt`, and publishes the GitHub Release.
+Do not push a tag or publish a release without approval.
+
+## Stable releases
+
+Stable tags use exactly `vMAJOR.MINOR.PATCH` and are published as normal GitHub Releases (not prereleases):
+
+```bash
+# config/metadata.go: Version = "2.1.6"
+git tag v2.1.6
+git push origin v2.1.6
+```
+
+## Pre-releases
+
+Test releases use `-alpha.N`, `-beta.N`, or the preferred `-rc.N` suffix. The workflow publishes them with `prerelease: true`:
+
+```bash
+# config/metadata.go: Version = "2.1.6-rc.1"
+git tag v2.1.6-rc.1
+git push origin v2.1.6-rc.1
+```
+
+After testing, publish a separate stable tag such as `v2.1.6`. Never move or overwrite existing tags or releases.
 
 Release artifacts:
 

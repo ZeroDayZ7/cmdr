@@ -62,7 +62,8 @@ jobs:
           Get-ChildItem $env:GITHUB_WORKSPACE -Filter "resource_windows_*.syso" -File | Remove-Item -Force -ErrorAction SilentlyContinue
           goversioninfo.exe -64 -icon build/windows/icon.ico -manifest build/windows/manifest.xml -o $syso -propagate-ver-strings build/windows/versioninfo.json
           if ($LASTEXITCODE -ne 0) { throw "goversioninfo failed" }
-          $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=2.1.4 -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
+          $projectVersion = (Select-String -Path config/metadata.go -Pattern 'Version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=$projectVersion -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
           New-Item -ItemType Directory -Force dist | Out-Null
           go build -trimpath -ldflags $ldflags -o dist/cmdr.exe .
           if (-not (Test-Path dist/cmdr.exe)) { throw "Windows binary missing" }
@@ -101,8 +102,10 @@ jobs:
         run: |
           COMMIT=$(git rev-parse HEAD)
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          PROJECT_VERSION=$(sed -n 's/^.*Version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' config/metadata.go | head -1)
+          test -n "$PROJECT_VERSION"
           mkdir -p dist
-          go build -trimpath -ldflags "-s -w -X github.com/zerodayz7/cmdr/config.Version=2.1.4 -X github.com/zerodayz7/cmdr/config.GitCommit=$COMMIT -X github.com/zerodayz7/cmdr/config.BuildDate=$BUILD_DATE" -o dist/cmdr .
+          go build -trimpath -ldflags "-s -w -X github.com/zerodayz7/cmdr/config.Version=$PROJECT_VERSION -X github.com/zerodayz7/cmdr/config.GitCommit=$COMMIT -X github.com/zerodayz7/cmdr/config.BuildDate=$BUILD_DATE" -o dist/cmdr .
           test -s dist/cmdr
           file dist/cmdr
       - name: Upload Linux artifact

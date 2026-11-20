@@ -80,15 +80,20 @@ func FetchLatestRelease(baseURL string, allowPrerelease bool) (*Release, error) 
 			if candidate.Draft {
 				continue
 			}
-			if candidate.TagName == "" {
+			candidateVersion, isPrerelease, err := ReleaseVersionTag(candidate.TagName)
+			if err != nil || isPrerelease != candidate.Prerelease {
 				continue
 			}
 			if selected == nil {
 				selected = candidate
 				continue
 			}
-			a, err := CompareVersions(strings.TrimPrefix(candidate.TagName, "v"), strings.TrimPrefix(selected.TagName, "v"))
-			if err == nil && a > 0 {
+			selectedVersion, _, err := ReleaseVersionTag(selected.TagName)
+			if err != nil {
+				continue
+			}
+			comparison, err := CompareVersions(candidateVersion, selectedVersion)
+			if err == nil && comparison > 0 {
 				selected = candidate
 			}
 		}
@@ -129,22 +134,26 @@ func CurrentPlatform() (string, string) {
 }
 
 func StableVersionTag(raw string) (string, error) {
-	text := strings.TrimSpace(raw)
-	if strings.HasPrefix(text, "v.") {
-		return "", fmt.Errorf("invalid release tag %q", raw)
+	version, prerelease, err := ParseReleaseTag(raw)
+	if err != nil || prerelease {
+		return "", fmt.Errorf("invalid stable release tag %q", raw)
 	}
-	if !strings.HasPrefix(text, "v") {
-		return "", fmt.Errorf("invalid release tag %q", raw)
-	}
-	core := strings.TrimPrefix(text, "v")
-	_, prerelease, err := ParseVersion(core)
-	if err != nil || prerelease != "" {
-		return "", fmt.Errorf("invalid release tag %q", raw)
-	}
-	return core, nil
+	return version, nil
+}
+
+func ReleaseVersionTag(raw string) (string, bool, error) {
+	return ParseReleaseTag(raw)
 }
 
 func FetchReleaseByTag(tag string) (*Release, error) {
+	return fetchReleaseByTag(tag, false)
+}
+
+func FetchReleaseByTagAny(tag string) (*Release, error) {
+	return fetchReleaseByTag(tag, true)
+}
+
+func fetchReleaseByTag(tag string, allowPrerelease bool) (*Release, error) {
 	url := strings.TrimRight(ReleasesAPIURL, "/") + "/tags/" + tag
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -178,7 +187,14 @@ func FetchReleaseByTag(tag string) (*Release, error) {
 	if release.Draft {
 		return nil, fmt.Errorf("release %s is a draft", tag)
 	}
-	if release.Prerelease {
+	_, isPrerelease, err := ParseReleaseTag(tag)
+	if err != nil {
+		return nil, err
+	}
+	if isPrerelease != release.Prerelease {
+		return nil, fmt.Errorf("release %s has inconsistent prerelease metadata", tag)
+	}
+	if isPrerelease && !allowPrerelease {
 		return nil, fmt.Errorf("release %s is a prerelease", tag)
 	}
 	return &release, nil

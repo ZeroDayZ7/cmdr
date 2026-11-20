@@ -34,14 +34,20 @@ func NewUpdateCmd() *cobra.Command {
 			var err error
 			if strings.TrimSpace(targetVersion) != "" {
 				version := strings.TrimSpace(targetVersion)
-				if _, prereleasePart, parseErr := updater.ParseVersion(version); parseErr != nil {
+				_, prereleasePart, parseErr := updater.ParseVersion(version)
+				if parseErr != nil {
 					return parseErr
-				} else if prereleasePart != "" {
+				}
+				if prereleasePart != "" && !prerelease {
 					return fmt.Errorf("pre-release versions require --prerelease")
 				}
 				version = strings.TrimPrefix(version, "v")
 				tag := "v" + version
-				release, err = updater.FetchReleaseByTag(tag)
+				if prerelease {
+					release, err = updater.FetchReleaseByTagAny(tag)
+				} else {
+					release, err = updater.FetchReleaseByTag(tag)
+				}
 			} else if prerelease {
 				release, err = updater.FetchLatestRelease(updater.ReleasesAPIURL, true)
 			} else {
@@ -52,9 +58,21 @@ func NewUpdateCmd() *cobra.Command {
 			}
 
 			latestTag := strings.TrimSpace(release.TagName)
-			latestVersion, err := updater.StableVersionTag(latestTag)
+			latestVersion, isPrerelease, err := updater.ReleaseVersionTag(latestTag)
 			if err != nil {
 				return err
+			}
+			if isPrerelease && !prerelease && strings.TrimSpace(targetVersion) == "" {
+				return fmt.Errorf("latest release is a pre-release; use --prerelease")
+			}
+			if !isPrerelease && prerelease {
+				return fmt.Errorf("--prerelease requires a pre-release release")
+			}
+			if isPrerelease != release.Prerelease {
+				return fmt.Errorf("release %s has inconsistent prerelease metadata", latestTag)
+			}
+			if release.Draft {
+				return fmt.Errorf("release %s has inconsistent release metadata", latestTag)
 			}
 			comparison, err := updater.CompareVersions(latestVersion, config.Version)
 			if err != nil {
