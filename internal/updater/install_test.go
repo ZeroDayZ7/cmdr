@@ -80,9 +80,6 @@ func TestValidateUpdatePaths(t *testing.T) {
 	if err := ValidateUpdatePaths(relative, relative, relative); err == nil {
 		t.Fatal("expected relative paths to fail")
 	}
-	for _, value := range []string{"", filepath.Join(t.TempDir(), "cmdr.exe")} {
-		_ = value
-	}
 	absoluteDir := t.TempDir()
 	if err := ValidateUpdatePaths(filepath.Join(absoluteDir, "cmdr.exe"), filepath.Join(absoluteDir, "staged.tmp"), filepath.Join(absoluteDir, "result")); err != nil {
 		t.Fatalf("absolute paths rejected: %v", err)

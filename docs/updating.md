@@ -33,7 +33,7 @@ cmdr update --check --prerelease
 cmdr update --prerelease
 ```
 
-Prerelease mode recognizes `-alpha.N`, `-beta.N`, and `-rc.N`. It can progress from a prerelease to a newer prerelease or to a stable release. Prereleases are never exposed by ordinary `cmdr update`. Downgrades and reinstalls still require `--force`.
+Prerelease mode recognizes SemVer prerelease tags and is intended for the preferred `-rc.N` test format. It can progress from a prerelease to a newer prerelease or to a stable release. Prereleases are never exposed by ordinary `cmdr update`. Downgrades and reinstalls still require `--force`.
 
 ## Security
 

@@ -3,6 +3,7 @@
 package updater
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,13 @@ import (
 
 	"golang.org/x/sys/windows"
 )
+
+var openUpdateProcess = windows.OpenProcess
+var waitForUpdateProcess = windows.WaitForSingleObject
+var closeUpdateProcessHandle = windows.CloseHandle
+var replaceUpdateExecutable = replaceMoveFileEx
+var renameUpdateFile = os.Rename
+var waitUpdateProcessExit = waitForProcessExit
 
 func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 	resultPath := stagedPath + ".result"
@@ -21,6 +29,7 @@ func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 	}
 
 	helper, err := os.Executable()
+	// helper, err := filepath.Abs(helper)
 	if err != nil {
 		return fmt.Errorf("resolve cmdr executable path: %w", err)
 	}
@@ -52,9 +61,6 @@ func ApplyWindowsUpdate(target, staged string, pid int) error {
 	if pid <= 0 {
 		return fmt.Errorf("invalid parent cmdr PID: %d", pid)
 	}
-	if err := waitForProcessExit(pid, 60*time.Second); err != nil {
-		return fmt.Errorf("wait for cmdr process PID %d: %w", pid, err)
-	}
 
 	targetInfo, err := os.Stat(target)
 	if err != nil {
@@ -71,14 +77,20 @@ func ApplyWindowsUpdate(target, staged string, pid int) error {
 		return fmt.Errorf("invalid staged executable: %q", staged)
 	}
 
-	backup := target + ".cmdr-backup"
-	_ = os.Remove(backup)
-	if err := os.Rename(target, backup); err != nil {
+	if err := waitUpdateProcessExit(pid, 60*time.Second); err != nil {
+		return fmt.Errorf("wait for cmdr process PID %d: %w", pid, err)
+	}
+
+	backup, err := createUniqueBackupPath(target)
+	if err != nil {
+		return err
+	}
+	if err := renameUpdateFile(target, backup); err != nil {
 		return fmt.Errorf("backup existing executable %q: %w", target, err)
 	}
 
-	if err := replaceMoveFileEx(staged, target, true); err != nil {
-		restoreErr := os.Rename(backup, target)
+	if err := replaceUpdateExecutable(staged, target, true); err != nil {
+		restoreErr := renameUpdateFile(backup, target)
 		if restoreErr != nil {
 			_ = os.Remove(staged)
 			return fmt.Errorf("replace executable %q with %q failed: %v; rollback failed: %w", target, staged, err, restoreErr)
@@ -90,7 +102,7 @@ func ApplyWindowsUpdate(target, staged string, pid int) error {
 	info, err := os.Stat(target)
 	if err != nil || info.IsDir() || info.Size() == 0 {
 		_ = os.Remove(target)
-		restoreErr := os.Rename(backup, target)
+		restoreErr := renameUpdateFile(backup, target)
 		if restoreErr != nil {
 			return fmt.Errorf("verify installed executable %q failed; rollback failed: %w", target, restoreErr)
 		}
@@ -122,17 +134,35 @@ func ApplyWindowsUpdateHelper(target, staged, result string, pid int) error {
 }
 
 func waitForProcessExit(pid int, timeout time.Duration) error {
+	if pid <= 0 {
+		return fmt.Errorf("invalid parent cmdr PID: %d", pid)
+	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		handle, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(pid))
+		handle, err := openUpdateProcess(windows.SYNCHRONIZE, false, uint32(pid))
 		if err != nil {
-			// OpenProcess cannot find a handle after the parent process exits.
-			return nil
+			if errors.Is(err, windows.ERROR_NOT_FOUND) {
+				return nil
+			}
+			if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
+				return fmt.Errorf("invalid parent cmdr PID %d", pid)
+			}
+			if errors.Is(err, windows.ERROR_INVALID_HANDLE) {
+				return fmt.Errorf("invalid process handle while checking parent cmdr PID %d: %w", pid, err)
+			}
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				return fmt.Errorf("access denied while opening parent cmdr PID %d: %w", pid, err)
+			}
+			return fmt.Errorf("unable to open parent cmdr PID %d: %w", pid, err)
 		}
-		status, waitErr := windows.WaitForSingleObject(handle, 250)
-		_ = windows.CloseHandle(handle)
+
+		status, waitErr := waitForUpdateProcess(handle, 250)
+		_ = closeUpdateProcessHandle(handle)
 		if waitErr == nil && status == windows.WAIT_OBJECT_0 {
 			return nil
+		}
+		if waitErr != nil && waitErr != windows.ERROR_TIMEOUT {
+			return fmt.Errorf("wait for parent cmdr PID %d failed: %w", pid, waitErr)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -177,4 +207,22 @@ func writableDirectory(dir string) bool {
 	_ = probe.Close()
 	_ = os.Remove(name)
 	return true
+}
+
+func createUniqueBackupPath(target string) (string, error) {
+	dir := filepath.Dir(target)
+	base := filepath.Base(target)
+	ext := filepath.Ext(base)
+	name := base[:len(base)-len(ext)]
+	timestamp := time.Now().Format("20060102150405")
+	backup := filepath.Join(dir, fmt.Sprintf("%s-%s%s", name, timestamp, ext))
+
+	i := 1
+	for {
+		if _, err := os.Stat(backup); os.IsNotExist(err) {
+			return backup, nil
+		}
+		backup = filepath.Join(dir, fmt.Sprintf("%s-%s-%d%s", name, timestamp, i, ext))
+		i++
+	}
 }

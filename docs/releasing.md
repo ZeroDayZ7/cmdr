@@ -48,7 +48,7 @@ git push origin v2.1.6
 
 ## Pre-releases
 
-Test releases use `-alpha.N`, `-beta.N`, or the preferred `-rc.N` suffix. The workflow publishes them with `prerelease: true`:
+Test releases use the preferred `-rc.N` suffix. The workflow publishes them with `prerelease: true`:
 
 ```bash
 # config/metadata.go: Version = "2.1.6-rc.1"
