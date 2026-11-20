@@ -62,3 +62,22 @@ func PrepareStagedBinary(newBinary, targetDir string) (string, error) {
 	}
 	return staged, nil
 }
+
+func ValidateUpdatePaths(target, staged, result string) error {
+	for name, path := range map[string]string{"target": target, "staged": staged, "result": result} {
+		if path == "" {
+			return fmt.Errorf("%s path is empty", name)
+		}
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return fmt.Errorf("resolve absolute %s path %q: %w", name, path, err)
+		}
+		if !filepath.IsAbs(path) {
+			return fmt.Errorf("%s path must be absolute: %q", name, path)
+		}
+		if filepath.Clean(path) != absolute {
+			return fmt.Errorf("%s path is not canonical: %q", name, path)
+		}
+	}
+	return nil
+}

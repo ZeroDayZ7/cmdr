@@ -65,9 +65,6 @@ func NewUpdateCmd() *cobra.Command {
 			if isPrerelease && !prerelease && strings.TrimSpace(targetVersion) == "" {
 				return fmt.Errorf("latest release is a pre-release; use --prerelease")
 			}
-			if !isPrerelease && prerelease {
-				return fmt.Errorf("--prerelease requires a pre-release release")
-			}
 			if isPrerelease != release.Prerelease {
 				return fmt.Errorf("release %s has inconsistent prerelease metadata", latestTag)
 			}
@@ -169,6 +166,11 @@ func NewUpdateCmd() *cobra.Command {
 			if err := updater.ApplyPlatformUpdate(currentPath, stagedPath); err != nil {
 				_ = os.Remove(stagedPath)
 				return err
+			}
+			if goos == "windows" {
+				cmd.Println("Update helper is replacing cmdr.exe after this process exits.")
+				cmd.Println("If the update helper reports an error, run 'cmdr version' and inspect the update result.")
+				return nil
 			}
 			cmd.Printf("Successfully updated cmdr to v%s.\n", latestVersion)
 			return nil
