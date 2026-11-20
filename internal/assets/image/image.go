@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/chai2010/webp"
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/sys/windows"
 )
@@ -72,7 +73,7 @@ func DecodeImage(path string) (image.Image, string, error) {
 
 func IsSupportedOutputFormat(ext string) bool {
 	switch strings.ToLower(strings.TrimPrefix(ext, ".")) {
-	case "png", "jpg", "jpeg", "gif":
+	case "png", "jpg", "jpeg", "gif", "webp":
 		return true
 	default:
 		return false
@@ -88,9 +89,16 @@ func OutputFormatFromPath(path string) (string, error) {
 		return "jpeg", nil
 	case ".gif":
 		return "gif", nil
+	case ".webp":
+		return "webp", nil
 	default:
 		return "", fmt.Errorf("unsupported output format: %s", path)
 	}
+}
+
+type EncodeOptions struct {
+	Quality  int
+	Lossless bool
 }
 
 func NormalizeOutputFormat(path, format string) (string, error) {
@@ -115,6 +123,10 @@ func NormalizeOutputFormat(path, format string) (string, error) {
 }
 
 func EncodeImage(path string, img image.Image, format string, overwrite bool) error {
+	return EncodeImageWithOptions(path, img, format, overwrite, EncodeOptions{Quality: 85})
+}
+
+func EncodeImageWithOptions(path string, img image.Image, format string, overwrite bool, options EncodeOptions) error {
 	if path == "" {
 		return errors.New("output path is empty")
 	}
@@ -135,6 +147,11 @@ func EncodeImage(path string, img image.Image, format string, overwrite bool) er
 	resolvedFormat, err := NormalizeOutputFormat(path, format)
 	if err != nil {
 		return err
+	}
+	if resolvedFormat == "webp" {
+		if options.Quality < 1 || options.Quality > 100 {
+			return fmt.Errorf("WebP quality must be between 1 and 100: got %d", options.Quality)
+		}
 	}
 	if info, err := os.Stat(path); err == nil {
 		if info.IsDir() {
@@ -166,7 +183,7 @@ func EncodeImage(path string, img image.Image, format string, overwrite bool) er
 		imgToEncode = compositeOnWhite(img)
 	}
 
-	if err := encodeImage(tmpFile, imgToEncode, resolvedFormat); err != nil {
+	if err := encodeImage(tmpFile, imgToEncode, resolvedFormat, options); err != nil {
 		cleanup()
 		return fmt.Errorf("encode image %s: %w", path, err)
 	}
@@ -244,7 +261,14 @@ func scaleImage(img image.Image, targetW, targetH int) image.Image {
 	return out
 }
 
-func encodeImage(w io.Writer, img image.Image, format string) error {
+func encodeImage(w io.Writer, img image.Image, format string, options ...EncodeOptions) error {
+	encodingOptions := EncodeOptions{Quality: 85}
+	if len(options) > 0 {
+		encodingOptions = options[0]
+	}
+	if encodingOptions.Quality == 0 {
+		encodingOptions.Quality = 85
+	}
 	switch format {
 	case "png":
 		return png.Encode(w, img)
@@ -252,6 +276,8 @@ func encodeImage(w io.Writer, img image.Image, format string) error {
 		return jpeg.Encode(w, img, &jpeg.Options{Quality: 90})
 	case "gif":
 		return gif.Encode(w, img, nil)
+	case "webp":
+		return webp.Encode(w, img, &webp.Options{Quality: float32(encodingOptions.Quality), Lossless: encodingOptions.Lossless, Exact: true})
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
 	}

@@ -16,6 +16,7 @@ func NewAssetsCmd() *cobra.Command {
 
 	cmd.AddCommand(NewFaviconCmd())
 	cmd.AddCommand(NewResizeCmd())
+	cmd.AddCommand(NewConvertCmd())
 	cmd.AddCommand(NewConfigCmd())
 	return cmd
 }

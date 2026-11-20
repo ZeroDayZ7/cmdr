@@ -16,11 +16,14 @@ var DefaultIgnoreList = []string{
 	".git", ".github", ".gitattributes", ".gitignore", ".idea", ".vs", ".vscode",
 	"LICENSE", "README.md", "scripts", "test",
 
-	// Zbudowane pliki binarne i katalogi wyjściowe
-	"bin", "dist", "out", "target", "build", "obj",
+	// Zbudowane pliki binarne, zależności i katalogi wyjściowe
+	"bin", "dist", "out", "target", "build", "obj", "vendor",
 
-	// Web, Node.js i Angular
-	"node_modules", ".angular",
+	// Web, Node.js, Next.js i Angular
+	"node_modules", ".next", ".angular",
+
+	// Rust
+	".cargo",
 
 	// Flutter i Dart
 	".dart_tool", ".flutter-plugins-dependencies", ".metadata",

@@ -142,7 +142,7 @@ func TestAnnotateFile_Integration(t *testing.T) {
 		t.Fatalf("failed to read annotated file: %v", err)
 	}
 
-result := string(content)
+	result := string(content)
 	if !strings.Contains(result, "main.go") {
 		t.Error("Annotation does not contain filename 'main.go'")
 	}

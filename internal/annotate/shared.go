@@ -160,6 +160,7 @@ func HasAnnotation(content string) bool {
 		strings.HasPrefix(firstLine, "<!--") ||
 		strings.HasPrefix(firstLine, "/*")
 }
+
 //#endregion
 
 func FindProjectRoot(path string, cfg Config) (string, error) {
