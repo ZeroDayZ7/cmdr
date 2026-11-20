@@ -20,7 +20,7 @@ var renameUpdateFile = os.Rename
 var waitUpdateProcessExit = waitForProcessExit
 
 func ApplyPlatformUpdate(currentPath, stagedPath string) error {
-	resultPath := stagedPath + ".result"
+	resultPath := currentPath + ".cmdr-update.result"
 	if err := ValidateUpdatePaths(currentPath, stagedPath, resultPath); err != nil {
 		return err
 	}
@@ -49,6 +49,8 @@ func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 		"--pid", fmt.Sprintf("%d", os.Getpid())},
 		&os.ProcAttr{Files: []*os.File{os.Stdin, os.Stdout, os.Stderr}, Dir: filepath.Dir(helper)})
 	if err != nil {
+		message := fmt.Sprintf("error: start Windows update helper %q: %v", helper, err)
+		writeUpdateResult(resultPath, message)
 		return fmt.Errorf("start Windows update helper %q: %w", helper, err)
 	}
 	_ = process.Release()
@@ -116,20 +118,20 @@ func ApplyWindowsUpdate(target, staged string, pid int) error {
 
 func ApplyWindowsUpdateHelper(target, staged, result string, pid int) error {
 	if err := ValidateUpdatePaths(target, staged, result); err != nil {
-		writeUpdateResult(result, err.Error())
+		writeUpdateResult(result, "error: "+err.Error())
 		return err
 	}
 
 	err := ApplyWindowsUpdate(target, staged, pid)
 	if err != nil {
-		writeUpdateResult(result, err.Error())
+		writeUpdateResult(result, "error: "+err.Error())
 		_ = os.Remove(staged)
 		fmt.Fprintf(os.Stderr, "cmdr update failed: %v\n", err)
 		return err
 	}
 
 	_ = os.Remove(staged)
-	_ = os.Remove(result)
+	writeUpdateResult(result, "success")
 	fmt.Println("cmdr Windows update completed successfully.")
 	return nil
 }

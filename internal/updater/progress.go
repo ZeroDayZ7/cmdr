@@ -22,7 +22,10 @@ func ProgressPercentage(downloaded, total int64) int {
 	if total <= 0 {
 		return -1
 	}
-	if downloaded <= 0 {
+	if downloaded < 0 {
+		return -1
+	}
+	if downloaded == 0 {
 		return 0
 	}
 	if downloaded >= total {
@@ -72,6 +75,9 @@ func DownloadETA(downloaded, total int64, elapsed time.Duration) time.Duration {
 		return -1
 	}
 	remaining := float64(total - downloaded)
+	if remaining < 0 {
+		return -1
+	}
 	seconds := remaining / speed
 	if seconds < 0 || seconds > float64(24*time.Hour/time.Second) {
 		return -1

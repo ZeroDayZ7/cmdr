@@ -59,6 +59,10 @@ func DownloadToFileWithProgress(url, destination string, maxBytes int64, onProgr
 				cleanup()
 				return fmt.Errorf("write download: %w", writeErr)
 			}
+			if writtenBytes != read {
+				cleanup()
+				return fmt.Errorf("write download: %w", io.ErrShortWrite)
+			}
 			now := time.Now()
 			if onProgress != nil && (lastProgress.IsZero() || now.Sub(lastProgress) >= progressRefreshInterval) {
 				lastProgress = now
