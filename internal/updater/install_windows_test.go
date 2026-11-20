@@ -8,12 +8,33 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/windows"
 )
 
 func TestWriteUpdateResultAtomic(t *testing.T) {
 	dir := t.TempDir()
+	for _, status := range []string{"pending", "success", "error: replace failed"} {
+		result := filepath.Join(dir, "update.result")
+		if err := writeUpdateResult(result, status); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(result)
+		if err != nil || string(data) != status {
+			t.Fatalf("status = %q, %v", data, err)
+		}
+		if _, err := os.Stat(result + ".tmp"); !os.IsNotExist(err) {
+			t.Fatal("temporary result file remains")
+		}
+	}
+}
+
+func TestWriteUpdateResultLegacyBody(t *testing.T) {
+	dir := t.TempDir()
 	result := filepath.Join(dir, "update.result")
-	writeUpdateResult(result, "replace failed")
+	if err := writeUpdateResult(result, "replace failed"); err != nil {
+		t.Fatal(err)
+	}
 	data, err := os.ReadFile(result)
 	if err != nil {
 		t.Fatal(err)
@@ -164,5 +185,29 @@ func TestApplyWindowsUpdateFailedRollbackKeepsBackup(t *testing.T) {
 	err := ApplyWindowsUpdate(target, staged, os.Getpid())
 	if err == nil || !strings.Contains(err.Error(), "rollback failed") {
 		t.Fatalf("expected rollback failure, got %v", err)
+	}
+}
+
+func TestWaitForProcessExitParentExitedBeforeOpen(t *testing.T) {
+	oldOpen := openUpdateProcess
+	openUpdateProcess = func(uint32, bool, uint32) (windows.Handle, error) {
+		return windows.InvalidHandle, windows.ERROR_INVALID_PARAMETER
+	}
+	defer func() { openUpdateProcess = oldOpen }()
+
+	if err := waitForProcessExit(1234, time.Second); err != nil {
+		t.Fatalf("expected exited parent to allow replacement, got %v", err)
+	}
+}
+
+func TestWaitForProcessExitAccessDenied(t *testing.T) {
+	oldOpen := openUpdateProcess
+	openUpdateProcess = func(uint32, bool, uint32) (windows.Handle, error) {
+		return windows.InvalidHandle, windows.ERROR_ACCESS_DENIED
+	}
+	defer func() { openUpdateProcess = oldOpen }()
+
+	if err := waitForProcessExit(1234, time.Second); err == nil {
+		t.Fatal("expected access denied to block replacement")
 	}
 }

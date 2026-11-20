@@ -38,7 +38,10 @@ func PrepareStagedBinary(newBinary, targetDir string) (string, error) {
 		return "", err
 	}
 	staged := out.Name()
-	out.Close()
+	if err := out.Close(); err != nil {
+		_ = os.Remove(staged)
+		return "", fmt.Errorf("close staged temporary file: %w", err)
+	}
 
 	input, err := os.Open(newBinary)
 	if err != nil {

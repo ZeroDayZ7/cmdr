@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -156,5 +157,24 @@ func TestDownloadToFileHonorsHTTPStatusAndSize(t *testing.T) {
 	defer server.Close()
 	if err := DownloadToFile(server.URL, filepath.Join(t.TempDir(), "archive"), 1024); err == nil {
 		t.Fatal("expected HTTP 403 error")
+	}
+}
+
+func TestDownloadToFileLengthMismatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		_, _ = w.Write([]byte("short"))
+	}))
+	defer server.Close()
+	destination := filepath.Join(t.TempDir(), "archive")
+	err := DownloadToFile(server.URL, destination, 1024)
+	if err == nil {
+		t.Fatal("expected incomplete download error")
+	}
+	if !strings.Contains(err.Error(), "length mismatch") && !strings.Contains(err.Error(), "download interrupted") {
+		t.Fatalf("expected incomplete download error, got %v", err)
+	}
+	if _, statErr := os.Stat(destination); !os.IsNotExist(statErr) {
+		t.Fatal("partial archive should not replace destination")
 	}
 }

@@ -180,7 +180,8 @@ func NewUpdateCmd() *cobra.Command {
 			}
 			if goos == "windows" {
 				cmd.Println("Update helper is replacing cmdr.exe after this process exits.")
-				cmd.Println("If the update helper reports an error, run 'cmdr version' and inspect the update result.")
+				cmd.Printf("Windows update status file: %s.cmdr-update.result\n", currentPath)
+				cmd.Println("Do not report success until the status file contains 'success'.")
 				return nil
 			}
 			updater.PrintCompleted(cmd.OutOrStdout(), latestVersion)

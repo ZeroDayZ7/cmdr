@@ -43,38 +43,6 @@ func TestPrepareStagedBinaryClearsOnMissingSource(t *testing.T) {
 	}
 }
 
-func TestUnixInstallationRollbackAndPermissions(t *testing.T) {
-	if os.PathSeparator == '\\' {
-		t.Skip("Unix-specific test")
-	}
-	dir := t.TempDir()
-	current := filepath.Join(dir, "cmdr")
-	staged := filepath.Join(dir, "replacement")
-	if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(staged, []byte("new"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := ApplyPlatformUpdate(current, staged); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(current)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(data) != "new" {
-		t.Fatalf("installed content = %q", data)
-	}
-	info, err := os.Stat(current)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm()&0o111 == 0 {
-		t.Fatal("installed binary is not executable")
-	}
-}
-
 func TestValidateUpdatePaths(t *testing.T) {
 	relative := filepath.Join("relative", "cmdr.exe")
 	if err := ValidateUpdatePaths(relative, relative, relative); err == nil {

@@ -74,6 +74,9 @@ func DownloadToFileWithProgress(url, destination string, maxBytes int64, onProgr
 		}
 		if readErr != nil {
 			cleanup()
+			if readErr == io.ErrUnexpectedEOF && resp.ContentLength >= 0 {
+				return fmt.Errorf("download interrupted: received %d of %d bytes: %w", written, resp.ContentLength, readErr)
+			}
 			return fmt.Errorf("download interrupted: %w", readErr)
 		}
 	}

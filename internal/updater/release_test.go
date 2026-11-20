@@ -13,7 +13,7 @@ func TestParseVersion(t *testing.T) {
 			t.Fatalf("ParseVersion(%q): %v", raw, err)
 		}
 	}
-	invalid := []string{"", "v.1.0.1", "1.2", "01.2.3", "1.x.3"}
+	invalid := []string{"", "v.1.0.1", "1.2", "01.2.3", "1.x.3", "2.1.6-rc.01", "2.1.6-rc..1", "2.1.6-rc.1+bad_meta"}
 	for _, raw := range invalid {
 		if _, _, err := ParseVersion(raw); err == nil {
 			t.Fatalf("expected ParseVersion(%q) to fail", raw)
@@ -106,5 +106,18 @@ func TestPlatformAssetName(t *testing.T) {
 	}
 	if _, err := PlatformAssetName("darwin", "amd64", "2.1.5"); err == nil {
 		t.Fatal("expected unsupported platform")
+	}
+}
+
+func TestHTTPClientHasNoTotalDownloadTimeout(t *testing.T) {
+	if httpClient.Timeout != 0 {
+		t.Fatalf("httpClient.Timeout = %v, want 0", httpClient.Timeout)
+	}
+	transport, ok := httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("httpClient transport is not *http.Transport")
+	}
+	if transport.ResponseHeaderTimeout <= 0 {
+		t.Fatal("ResponseHeaderTimeout must be positive")
 	}
 }

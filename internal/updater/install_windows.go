@@ -41,7 +41,9 @@ func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 		return fmt.Errorf("Windows update helper executable not found: %s: %w", helper, err)
 	}
 
-	writeUpdateResult(resultPath, "pending")
+	if err := writeUpdateResult(resultPath, "pending"); err != nil {
+		return err
+	}
 	process, err := os.StartProcess(helper, []string{helper, "update-helper",
 		"--target", currentPath,
 		"--staged", stagedPath,
@@ -50,7 +52,9 @@ func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 		&os.ProcAttr{Files: []*os.File{os.Stdin, os.Stdout, os.Stderr}, Dir: filepath.Dir(helper)})
 	if err != nil {
 		message := fmt.Sprintf("error: start Windows update helper %q: %v", helper, err)
-		writeUpdateResult(resultPath, message)
+		if statusErr := writeUpdateResult(resultPath, message); statusErr != nil {
+			return fmt.Errorf("start Windows update helper %q: %w; additionally could not write update status: %v", helper, err, statusErr)
+		}
 		return fmt.Errorf("start Windows update helper %q: %w", helper, err)
 	}
 	_ = process.Release()
@@ -118,20 +122,29 @@ func ApplyWindowsUpdate(target, staged string, pid int) error {
 
 func ApplyWindowsUpdateHelper(target, staged, result string, pid int) error {
 	if err := ValidateUpdatePaths(target, staged, result); err != nil {
-		writeUpdateResult(result, "error: "+err.Error())
+		statusErr := writeUpdateResult(result, "error: "+err.Error())
+		if statusErr != nil {
+			return fmt.Errorf("%w; additionally could not write update status: %v", err, statusErr)
+		}
 		return err
 	}
 
 	err := ApplyWindowsUpdate(target, staged, pid)
 	if err != nil {
-		writeUpdateResult(result, "error: "+err.Error())
+		statusErr := writeUpdateResult(result, "error: "+err.Error())
 		_ = os.Remove(staged)
+		if statusErr != nil {
+			fmt.Fprintf(os.Stderr, "cmdr update failed: %v; additionally could not write update status: %v\n", err, statusErr)
+			return fmt.Errorf("%w; additionally could not write update status: %v", err, statusErr)
+		}
 		fmt.Fprintf(os.Stderr, "cmdr update failed: %v\n", err)
 		return err
 	}
 
 	_ = os.Remove(staged)
-	writeUpdateResult(result, "success")
+	if statusErr := writeUpdateResult(result, "success"); statusErr != nil {
+		return fmt.Errorf("update replaced executable, but could not write success status: %w", statusErr)
+	}
 	fmt.Println("cmdr Windows update completed successfully.")
 	return nil
 }
@@ -148,7 +161,8 @@ func waitForProcessExit(pid int, timeout time.Duration) error {
 				return nil
 			}
 			if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
-				return fmt.Errorf("invalid parent cmdr PID %d", pid)
+				// Parent may exit before the helper opens its first process handle.
+				return nil
 			}
 			if errors.Is(err, windows.ERROR_INVALID_HANDLE) {
 				return fmt.Errorf("invalid process handle while checking parent cmdr PID %d: %w", pid, err)
@@ -172,17 +186,20 @@ func waitForProcessExit(pid int, timeout time.Duration) error {
 	return fmt.Errorf("timed out after %s waiting for cmdr process PID %d", timeout, pid)
 }
 
-func writeUpdateResult(path, message string) {
+func writeUpdateResult(path, message string) error {
 	if path == "" {
-		return
+		return fmt.Errorf("update result path is empty")
 	}
 	tmp := path + ".tmp"
 	_ = os.Remove(tmp)
-	if err := os.WriteFile(tmp, []byte(message), 0o600); err == nil {
-		_ = os.Remove(path)
-		_ = os.Rename(tmp, path)
+	if err := os.WriteFile(tmp, []byte(message), 0o600); err != nil {
+		return fmt.Errorf("write update status %q: %w", tmp, err)
 	}
-	_ = os.Remove(tmp)
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("publish update status %q: %w", path, err)
+	}
+	return nil
 }
 
 func replaceMoveFileEx(src, dst string, overwrite bool) error {

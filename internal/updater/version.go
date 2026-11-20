@@ -29,14 +29,56 @@ func ParseVersion(raw string) ([3]int, string, error) {
 	prerelease := ""
 	if len(parts) == 2 {
 		prerelease = parts[1]
-		if prerelease == "" {
+		if !validSemverPrerelease(prerelease) {
 			return [3]int{}, "", fmt.Errorf("invalid semantic version %q", raw)
 		}
 	}
 	return out, prerelease, nil
 }
 
+func validSemverPrerelease(raw string) bool {
+	buildIndex := strings.Index(raw, "+")
+	if buildIndex >= 0 {
+		build := raw[buildIndex+1:]
+		if !validSemverIdentifiers(build) {
+			return false
+		}
+		raw = raw[:buildIndex]
+	}
+	return validSemverIdentifiers(raw)
+}
+
+func validSemverIdentifiers(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	for _, identifier := range strings.Split(raw, ".") {
+		if identifier == "" {
+			return false
+		}
+		numeric := true
+		for _, char := range identifier {
+			if char < '0' || char > '9' {
+				numeric = false
+			}
+			if (char < '0' || char > '9') && (char < 'A' || char > 'Z') && (char < 'a' || char > 'z') && char != '-' {
+				return false
+			}
+		}
+		if numeric && len(identifier) > 1 && identifier[0] == '0' {
+			return false
+		}
+	}
+	return true
+}
+
 func CompareVersions(a, b string) (int, error) {
+	if buildIndex := strings.Index(a, "+"); buildIndex >= 0 {
+		a = a[:buildIndex]
+	}
+	if buildIndex := strings.Index(b, "+"); buildIndex >= 0 {
+		b = b[:buildIndex]
+	}
 	av, apr, err := ParseVersion(a)
 	if err != nil {
 		return 0, err
