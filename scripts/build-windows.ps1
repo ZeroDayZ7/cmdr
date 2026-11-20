@@ -89,7 +89,9 @@ if ($null -eq $goversioninfo) {
     $goversioninfo = Get-Command goversioninfo -ErrorAction SilentlyContinue
 }
 if ($null -eq $goversioninfo) {
-    $candidate = Join-Path ([Environment]::GetEnvironmentVariable("GOPATH", "Process") -replace "^$", (go env GOPATH)) "bin/goversioninfo.exe"
+    $gopath = [Environment]::GetEnvironmentVariable("GOPATH", "Process")
+    if ([string]::IsNullOrWhiteSpace($gopath)) { $gopath = go env GOPATH }
+    $candidate = Join-Path $gopath "bin/goversioninfo.exe"
     if (-not (Test-Path $candidate)) { throw "goversioninfo was installed but is not available in PATH: $candidate" }
     $goversioninfo = Get-Item $candidate
 }

@@ -16,7 +16,7 @@ jobs:
       version: ${{ steps.validate.outputs.version }}
       prerelease: ${{ steps.validate.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate tag and project version
         id: validate
         shell: bash
@@ -47,8 +47,8 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.27.0"
           cache: true
@@ -61,8 +61,8 @@ jobs:
     needs: [validate, test]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.27.0"
           cache: true
@@ -101,12 +101,14 @@ jobs:
             $field.Patch = $patch
             $field.Build = 0
           }
-          $versionJson | ConvertTo-Json -Depth 10 | Set-Content -NoNewline build/windows/versioninfo.json
+          $versionJsonText = $versionJson | ConvertTo-Json -Depth 10
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText((Resolve-Path build/windows/versioninfo.json).Path, $versionJsonText, $utf8NoBom)
           $assemblyVersion = "$major.$minor.$patch.0"
           $manifest = Get-Content -Raw build/windows/manifest.xml
           $replacement = '${1}' + $assemblyVersion + '${2}'
           $manifest = $manifest -replace '(<assemblyIdentity[^>]*\bversion=")[^"]*(")', $replacement
-          Set-Content -NoNewline build/windows/manifest.xml $manifest
+          [System.IO.File]::WriteAllText((Resolve-Path build/windows/manifest.xml).Path, $manifest, $utf8NoBom)
           goversioninfo.exe -64 -icon build/windows/icon.ico -manifest build/windows/manifest.xml -o resource_windows_amd64.syso -propagate-ver-strings build/windows/versioninfo.json
           if ($LASTEXITCODE -ne 0) { throw "goversioninfo failed" }
           $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=$env:RELEASE_VERSION -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
@@ -114,7 +116,7 @@ jobs:
           go build -trimpath -ldflags $ldflags -o dist/cmdr.exe .
           if (-not (Test-Path dist/cmdr.exe) -or (Get-Item dist/cmdr.exe).Length -le 0) { throw "Invalid Windows binary" }
           Remove-Item resource_windows_amd64.syso -Force -ErrorAction SilentlyContinue
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-windows-amd64
           path: dist/cmdr.exe
@@ -125,8 +127,8 @@ jobs:
     needs: [validate, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.27.0"
           cache: true
@@ -145,7 +147,7 @@ jobs:
           go build -trimpath -ldflags "-s -w -X github.com/zerodayz7/cmdr/config.Version=$RELEASE_VERSION -X github.com/zerodayz7/cmdr/config.GitCommit=$COMMIT -X github.com/zerodayz7/cmdr/config.BuildDate=$BUILD_DATE" -o dist/cmdr .
           test -s dist/cmdr
           file dist/cmdr
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-linux-amd64
           path: dist/cmdr
@@ -156,14 +158,14 @@ jobs:
     needs: [validate, windows-amd64, linux-amd64]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download Windows binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-windows-amd64
           path: package/windows
       - name: Download Linux binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-linux-amd64
           path: package/linux
