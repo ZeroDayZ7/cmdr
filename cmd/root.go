@@ -11,6 +11,7 @@ import (
 	"github.com/zerodayz7/cmdr/cmd/info"
 	"github.com/zerodayz7/cmdr/cmd/system"
 	"github.com/zerodayz7/cmdr/cmd/tools"
+	"github.com/zerodayz7/cmdr/internal/branding"
 	"github.com/zerodayz7/cmdr/internal/logger"
 )
 
@@ -23,7 +24,7 @@ var rootCmd = &cobra.Command{
 	Short: "cmdr is a developer helper tool",
 	Long:  `cmdr helps you run tasks like migrate, dev server, etc.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		l.Info("Welcome to cmdr! Use -h to see available commands.")
+		_ = cmd.Help()
 	},
 }
 
@@ -37,6 +38,14 @@ func Execute() {
 
 // #region init
 func init() {
+	rootHelp := rootCmd.HelpFunc()
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if cmd == rootCmd {
+			branding.Write(cmd.OutOrStdout())
+		}
+		rootHelp(cmd, args)
+	})
+
 	rootCmd.AddCommand(
 		assets.NewAssetsCmd(),
 		bootstrap.NewBootstrapCmd(),

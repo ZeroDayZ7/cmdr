@@ -142,3 +142,18 @@ bash ./scripts/build-linux.sh all
 ```
 
 Build artifacts are written below `bin/windows/<arch>` and `bin/linux/<arch>`.
+
+## Terminal branding
+
+Running `cmdr` without arguments, `cmdr help`, or `cmdr --help` displays a compact branded banner before Cobra help:
+
+```text
+  C  cmdr
+     DEVELOPER TOOLKIT · v2.1.4
+
+  Automate your development workflow.
+
+  Run cmdr --help to explore commands.
+```
+
+The banner uses the version from `config/metadata.go`. ANSI colors are disabled with `NO_COLOR`, when stdout is redirected or piped, and when the terminal environment is not detected as color-capable. Regular commands and subcommand help do not show the root banner.
