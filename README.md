@@ -122,3 +122,23 @@ Use "cmdr [command] --help" for more information about a command.
 ## Flags
 
 - `-h`, `--help`: Display help for the `cmdr` command or any individual command.
+
+## Builds
+
+Windows amd64 and arm64 artifacts use the shared project version and embedded icon metadata:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ./scripts/build-windows.ps1 -Arch amd64
+powershell -ExecutionPolicy Bypass -File ./scripts/build-windows.ps1 -Arch arm64
+powershell -ExecutionPolicy Bypass -File ./scripts/build-windows.ps1 -Arch all
+```
+
+Linux builds are kept separate and should be run on Linux or inside a Linux container/WSL:
+
+```bash
+bash ./scripts/build-linux.sh amd64
+bash ./scripts/build-linux.sh arm64
+bash ./scripts/build-linux.sh all
+```
+
+Build artifacts are written below `bin/windows/<arch>` and `bin/linux/<arch>`.

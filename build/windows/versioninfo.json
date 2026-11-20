@@ -1,0 +1,41 @@
+{
+    "StringFileInfo":  {
+                           "FileDescription":  "cmdr command-line developer tools",
+                           "OriginalFilename":  "cmdr.exe",
+                           "SpecialBuild":  "",
+                           "LegalCopyright":  "",
+                           "CompanyName":  "",
+                           "LegalTrademarks":  "",
+                           "FileVersion":  "2.1.4",
+                           "PrivateBuild":  "",
+                           "InternalName":  "cmdr",
+                           "Comments":  "",
+                           "ProductName":  "cmdr",
+                           "ProductVersion":  "2.1.4"
+                       },
+    "FixedFileInfo":  {
+                          "FileVersion":  {
+                                              "Minor":  1,
+                                              "Build":  0,
+                                              "Patch":  4,
+                                              "Major":  2
+                                          },
+                          "FileOS":  "040004",
+                          "FileFlagsMask":  "3f",
+                          "FileFlags":  "00",
+                          "ProductVersion":  {
+                                                 "Minor":  1,
+                                                 "Build":  0,
+                                                 "Patch":  4,
+                                                 "Major":  2
+                                             },
+                          "FileSubType":  "00",
+                          "FileType":  "01"
+                      },
+    "VarFileInfo":  {
+                        "Translation":  {
+                                            "LangID":  "0409",
+                                            "CharsetID":  "04B0"
+                                        }
+                    }
+}
