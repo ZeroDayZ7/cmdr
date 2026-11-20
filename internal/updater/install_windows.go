@@ -41,6 +41,7 @@ func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 		return fmt.Errorf("Windows update helper executable not found: %s: %w", helper, err)
 	}
 
+	writeUpdateResult(resultPath, "pending")
 	process, err := os.StartProcess(helper, []string{helper, "update-helper",
 		"--target", currentPath,
 		"--staged", stagedPath,

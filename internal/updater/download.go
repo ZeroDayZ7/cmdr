@@ -10,11 +10,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const MaxArchiveBytes int64 = 128 << 20
 
+type DownloadProgressFunc func(downloaded, total int64, elapsed time.Duration)
+
 func DownloadToFile(url, destination string, maxBytes int64) error {
+	return DownloadToFileWithProgress(url, destination, maxBytes, nil)
+}
+
+func DownloadToFileWithProgress(url, destination string, maxBytes int64, onProgress DownloadProgressFunc) error {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -38,10 +45,36 @@ func DownloadToFile(url, destination string, maxBytes int64) error {
 	}
 	tmp := out.Name()
 	cleanup := func() { _ = out.Close(); _ = os.Remove(tmp) }
-	written, err := io.Copy(out, io.LimitReader(resp.Body, maxBytes+1))
-	if err != nil {
-		cleanup()
-		return fmt.Errorf("download interrupted: %w", err)
+	started := time.Now()
+	limited := io.LimitReader(resp.Body, maxBytes+1)
+	buffer := make([]byte, 32*1024)
+	var written int64
+	var lastProgress time.Time
+	for {
+		read, readErr := limited.Read(buffer)
+		if read > 0 {
+			writtenBytes, writeErr := out.Write(buffer[:read])
+			written += int64(writtenBytes)
+			if writeErr != nil {
+				cleanup()
+				return fmt.Errorf("write download: %w", writeErr)
+			}
+			now := time.Now()
+			if onProgress != nil && (lastProgress.IsZero() || now.Sub(lastProgress) >= progressRefreshInterval) {
+				lastProgress = now
+				onProgress(written, resp.ContentLength, now.Sub(started))
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			cleanup()
+			return fmt.Errorf("download interrupted: %w", readErr)
+		}
+	}
+	if onProgress != nil {
+		onProgress(written, resp.ContentLength, time.Since(started))
 	}
 	if written > maxBytes {
 		cleanup()
