@@ -1,175 +1,194 @@
-# Cmdr
+# CMDR
 
-A fast, developer-friendly CLI for bootstrapping microservices and handy Go tools.
+**A fast, developer-friendly CLI toolkit for Go developers.**
+
+CMDR is a collection of practical command-line tools designed to simplify everyday development tasks, automate repetitive work, and improve productivity.
 
 ## Table of Contents
 
-- [Project Profiles (Smart Detection)](./docs/PROFILES_GUIDE.md)
-- [Prepare Password](./docs/PREPARE-PASSWORD.md)
-- [Tree Usage](./docs/TREE_USAGE.md)
-- [Assets](./docs/assets.md)
-- [Releasing](./docs/releasing.md)
-- [Updating](./docs/updating.md)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Available Commands](#available-commands)
+- [Documentation](#documentation)
+- [Supported Platforms](#supported-platforms)
+- [Updates](#updates)
+
+## Features
+
+- **Project Management** – detect project structures and bootstrap development environments.
+- **Asset Utilities** – generate favicon sets and resize images.
+- **Cryptography** – encrypt and decrypt files, generate keys, and create secure random data.
+- **File Management** – combine files, remove comments, and organize project contents.
+- **System Utilities** – inspect processes, manage ports, and perform system operations.
+- **Developer Tools** – explore project structures, inspect Go environments, and automate common tasks.
+
+## Installation
+
+Download the latest version for your platform from [GitHub Releases](https://github.com/ZeroDayZ7/cmdr/releases).
+
+Extract the archive and make the `cmdr` executable available in your system PATH.
 
 ## Usage
 
-Cmdr helps you run tasks like migrations, dev servers, and more.
+Display the main help:
 
 ```bash
-# Show help
 cmdr --help
-
 ```
 
-## Asset Utilities
-
-The `assets` command groups image-processing helpers for generating favicon sets and resizing image files for web and application projects.
+Get help for a specific command:
 
 ```bash
-# Generate a default favicon set from a source image
+cmdr assets --help
+cmdr crypto --help
+cmdr tree --help
+```
+
+## Available Commands
+
+| Command | Description |
+|---|---|
+| `assets` | Image utilities for generating favicons and resizing images. |
+| `ask` | Send questions to an AI API and receive responses. |
+| `clear` | Delete directories with a specified name in the current project. |
+| `completion` | Generate shell autocompletion scripts. |
+| `create-service` | Create a new microservice from a template. |
+| `crypto` | Cryptographic tools for encryption, decryption, keys, hashing, and random data. |
+| `files-combine` | Combine files with selected extensions into a single file. |
+| `hello` | Display a greeting. |
+| `info` | Show recommended Go project structures and development information. |
+| `killport` | Find and optionally terminate the process using a specified port. |
+| `killprocess` | Find and terminate processes by name. |
+| `remove-comments` | Remove comments from a file or directory. |
+| `tree` | Display directory structures in a readable tree format. |
+| `version` | Display application version and build information. |
+| `doctor` | Check application configuration, permissions, connectivity, and updater readiness. |
+
+For detailed usage and available flags, run:
+
+```bash
+cmdr <command> --help
+```
+
+## Examples
+
+### Asset Utilities
+
+Generate a favicon set:
+
+```bash
 cmdr assets favicon --input ./logo.png --output ./generated
+```
 
-# Resize an image to a fixed size and save it to a target path
+Resize an image:
+
+```bash
 cmdr assets resize --input ./source.png --output ./out/resized.jpg --width 1200 --height 800 --fit cover
+```
 
-# Initialize the default assets configuration file
+Initialize the default assets configuration:
+
+```bash
 cmdr assets config init
 ```
 
-For the detailed command reference, see [docs/assets.md](./docs/assets.md).
+### Cryptography
 
-## Example Command: `ask`
-
-The `ask` command allows you to send a question to an API (e.g., Gemini API) and get an immediate response.
+Generate a secure 20-character password:
 
 ```bash
-cmdr ask -q "test"
-
-```
-
-## Output:
-
-```bash
-Response: Okay, I'm here! What would you like me to do?
-
-```
-
-## Example Command: `crypto`
-
-The `crypto` command provides cryptographic utilities including file encryption (AES-GCM / Argon2id), key generation, and random data creation.
-
-```bash
-# Generate a secure 20-character password
 cmdr crypto r -t p -l 20
+```
 
-# Generate a 32-byte AES key (HEX/Base64)
+Generate a 32-byte AES key:
+
+```bash
 cmdr crypto r -t a -l 32
+```
 
-# Encrypt a file using a password (Argon2id + AES-GCM)
+Encrypt a file using Argon2id and AES-GCM:
+
+```bash
 cmdr crypto pass-encrypt -f secret.txt -p MyPassword123
+```
 
-# Decrypt a file encrypted with Argon2id
+Decrypt an encrypted file:
+
+```bash
 cmdr crypto pass-decrypt -f encrypted/secret.txt.enc -p MyPassword123
-
 ```
 
-## Configuration File
+### Version and Diagnostics
 
-When you first run the ask command, a .config.json file will be generated in the same directory as the executable. This file will look like this:
-
-```json
-{
-  "gemini": {
-    "url": "[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent)",
-    "apiKey": "your_gemini_api_key_here"
-  }
-}
-```
-
-## Other Available Commands
-
-Cmdr provides several commands to help with your Go and microservices tasks. Here’s a list of available commands:
-
-```bash
-cmdr helps you run tasks like migrate, dev server, etc.
-
-Usage:
-  cmdr [flags]
-  cmdr [command]
-
-Available Commands:
-  assets          Image utilities: generate favicon sets and resize images
-  ask             Ask questions to an API and get the answer
-  clear           Deletes all directories with the given name in the current project
-  completion      Generate the autocompletion script for the specified shell
-  create-service  Create a new microservice from a template
-  crypto          Cryptographic operations: keys, encryption, random data, hashing
-  files-combine   Combine contents of files with chosen extensions into one file
-  hello           Say hello
-  help            Help about any command
-  info            Show recommended Go project structure and common use cases
-  killport        Find and optionally kill the process using a port
-  killprocess     Find and optionally kill processes by name
-  remove-comments Remove comments from a specific file or all files in a directory
-  tree            Display a tree view of folders and files
-  version         Shows the CLI version
-
-Flags:
-  -h, --help   help for cmdr
-
-Use "cmdr [command] --help" for more information about a command.
-
-```
-
-## Flags
-
-- `-h`, `--help`: Display help for the `cmdr` command or any individual command.
-
-## Builds
-
-Windows amd64 and arm64 artifacts use the shared project version and embedded icon metadata:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File ./scripts/build-windows.ps1 -Arch amd64
-powershell -ExecutionPolicy Bypass -File ./scripts/build-windows.ps1 -Arch arm64
-powershell -ExecutionPolicy Bypass -File ./scripts/build-windows.ps1 -Arch all
-```
-
-Linux builds are kept separate and should be run on Linux or inside a Linux container/WSL:
-
-```bash
-bash ./scripts/build-linux.sh amd64
-bash ./scripts/build-linux.sh arm64
-bash ./scripts/build-linux.sh all
-```
-
-Build artifacts are written below `bin/windows/<arch>` and `bin/linux/<arch>`.
-
-## Terminal branding
-
-Running `cmdr` without arguments, `cmdr help`, or `cmdr --help` displays a compact branded banner before Cobra help:
-
-```text
-  C  cmdr
-     DEVELOPER TOOLKIT · v2.1.4
-
-  Automate your development workflow.
-
-  Run cmdr --help to explore commands.
-```
-
-The banner uses the version from `config/metadata.go`. ANSI colors are disabled with `NO_COLOR`, when stdout is redirected or piped, and when the terminal environment is not detected as color-capable. Regular commands and subcommand help do not show the root banner.
-
-## Version and diagnostics
+Display version information:
 
 ```bash
 cmdr version
-cmdr version --short
-cmdr version --json
-
-cmdr doctor
-cmdr doctor --verbose
-cmdr doctor --json
 ```
 
-`cmdr doctor` reports executable, configuration, permissions, GitHub API, and updater readiness. `OK` is passed, `WARN` is non-blocking, and `FAIL` requires attention. Warnings keep a zero exit code; failures return a non-zero exit code.
+Check application health:
+
+```bash
+cmdr doctor
+```
+
+Run detailed diagnostics:
+
+```bash
+cmdr doctor --verbose
+```
+
+## Documentation
+
+Detailed guides and command documentation are available in the `docs/` directory.
+
+| Document | Description |
+|---|---|
+| [Commands Reference](./docs/commands.md) | Detailed command reference and flags. |
+| [Project Profiles](./docs/PROFILES_GUIDE.md) | Project detection and profile management. |
+| [Prepare Password](./docs/PREPARE-PASSWORD.md) | Password preparation utilities. |
+| [Tree Usage](./docs/TREE_USAGE.md) | Directory tree generation and options. |
+| [Asset Utilities](./docs/assets.md) | Image processing and favicon generation. |
+| [Updating](./docs/updating.md) | Stable and pre-release update channels. |
+| [Releasing](./docs/releasing.md) | Building and publishing releases. |
+
+## Supported Platforms
+
+- Windows x64 (AMD64)
+- Linux x64 (AMD64)
+
+## Updates
+
+CMDR provides two update channels:
+
+- **Stable** – recommended for everyday use.
+- **Pre-release** – early access to upcoming versions.
+
+Check for stable updates:
+
+```bash
+cmdr update --check
+```
+
+Install the latest stable version:
+
+```bash
+cmdr update
+```
+
+Check for pre-releases:
+
+```bash
+cmdr update --check --prerelease
+```
+
+Install the latest pre-release:
+
+```bash
+cmdr update --prerelease
+```
+
+## License
+
+See [LICENSE](./LICENSE) for license information.

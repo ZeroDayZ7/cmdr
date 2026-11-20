@@ -1,6 +1,7 @@
 param(
     [ValidateSet("amd64")]
-    [string]$Arch = "amd64"
+    [string]$Arch = "amd64",
+    [string]$Version
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,20 +15,22 @@ function Test-CommandExists([string]$Name) {
 function Get-ProjectVersion {
     $metadataPath = Join-Path $root "config/metadata.go"
     $metadata = Get-Content -Raw -Path $metadataPath
-    if ($metadata -notmatch 'Version\s*=\s*"([0-9]+(?:\.[0-9]+){1,3})"') {
+    if ($metadata -notmatch 'Version\s*=\s*"([0-9]+(?:\.[0-9]+){2}(?:-[0-9A-Za-z.-]+)?)"') {
         throw "Could not read a valid Version from config/metadata.go"
     }
     return $Matches[1]
 }
 
 function Convert-VersionParts([string]$Version) {
-    $parts = $Version.Split('.') | ForEach-Object { [int]$_ }
+    $numericCore = ($Version -split '-')[0]
+    $parts = $numericCore.Split('.') | ForEach-Object { [int]$_ }
     while ($parts.Count -lt 4) { $parts += 0 }
-    if ($parts.Count -ne 4) { throw "Unsupported version format: $Version" }
+    if ($parts.Count -ne 4) { throw "Unsupported numeric version format: $Version" }
     return $parts
 }
 
 function Write-VersionConfig([string]$Version) {
+    $numericCore = ($Version -split '-', 2)[0]
     $parts = Convert-VersionParts $Version
     $configPath = Join-Path $root "build/windows/versioninfo.json"
     $config = @{
@@ -44,7 +47,7 @@ function Write-VersionConfig([string]$Version) {
             Comments = ""
             CompanyName = ""
             FileDescription = "cmdr command-line developer tools"
-            FileVersion = $Version
+            FileVersion = $numericCore
             InternalName = "cmdr"
             LegalCopyright = ""
             LegalTrademarks = ""
@@ -65,7 +68,8 @@ function Write-VersionConfig([string]$Version) {
 function Write-Manifest([string]$Version) {
     $manifestPath = Join-Path $root "build/windows/manifest.xml"
     $manifest = [System.IO.File]::ReadAllText($manifestPath, [System.Text.UTF8Encoding]::new($false))
-    $manifestVersion = ($Version.Split('.') | ForEach-Object { [int]$_ })
+    $numericCore = ($Version -split '-', 2)[0]
+    $manifestVersion = ($numericCore.Split('.') | ForEach-Object { [int]$_ })
     while ($manifestVersion.Count -lt 4) { $manifestVersion += 0 }
     $assemblyVersion = (($manifestVersion[0..3]) -join '.')
     $manifest = [regex]::Replace($manifest, '(<assemblyIdentity[^>]*\bversion=")[^"]*(")', '${1}' + $assemblyVersion + '${2}')
@@ -94,7 +98,7 @@ if (-not (Test-CommandExists "gcc")) {
     throw "CGO is required by github.com/chai2010/webp; GCC is not available in PATH."
 }
 
-$version = Get-ProjectVersion
+$version = if ([string]::IsNullOrWhiteSpace($Version)) { Get-ProjectVersion } else { $Version }
 $parts = Convert-VersionParts $version
 Write-VersionConfig $version
 Write-Manifest $version

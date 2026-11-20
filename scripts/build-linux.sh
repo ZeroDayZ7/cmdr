@@ -8,9 +8,10 @@ cd "$ROOT"
 unset CC
 
 ARCH="${1:-amd64}"
+VERSION_OVERRIDE="${2:-}"
 case "$ARCH" in
   amd64) ;;
-  *) echo "Usage: $0 amd64" >&2; exit 2 ;;
+  *) echo "Usage: $0 amd64 [full-version]" >&2; exit 2 ;;
 esac
 
 if ! command -v go >/dev/null 2>&1; then
@@ -37,7 +38,7 @@ for TARGET_ARCH in "${ARCHES[@]}"; do
     fi
   fi
 
-  VERSION="$(sed -n 's/^[[:space:]]*Version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' config/metadata.go | head -1)"
+  VERSION="${VERSION_OVERRIDE:-$(sed -n 's/^[[:space:]]*Version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' config/metadata.go | head -1)}"
   COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
   BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   if [[ -z "$VERSION" ]]; then
