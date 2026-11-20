@@ -47,6 +47,9 @@ func init() {
 	})
 
 	rootCmd.AddCommand(
+		NewDoctorCmd(),
+		NewUpdateCmd(),
+		NewUpdateHelperCmd(),
 		assets.NewAssetsCmd(),
 		bootstrap.NewBootstrapCmd(),
 		crypto.NewCmd(),               // crypto

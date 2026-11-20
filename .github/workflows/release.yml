@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag and project version
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid release tag: $TAG" >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          PROJECT_VERSION=$(sed -n 's/^.*Version[[:space:]]*=[[:space:]]*"\([^"]*\)".*$/\1/p' config/metadata.go | head -1)
+          if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
+            echo "Tag version $VERSION does not match config.Version $PROJECT_VERSION" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test before release
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+          cache: true
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test ./...
+
+  windows-amd64:
+    name: Build Windows amd64 release
+    needs: [validate, test]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+          cache: true
+      - name: Install MinGW and goversioninfo
+        shell: pwsh
+        run: |
+          winget install --id MSYS2.MSYS2 -e --silent --accept-source-agreements --accept-package-agreements
+          C:\msys64\usr\bin\pacman.exe -Syu --noconfirm
+          C:\msys64\usr\bin\pacman.exe -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc
+          echo "C:\msys64\ucrt64\bin" >> $env:GITHUB_PATH
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.7.0
+          echo "C:\Users\runneradmin\go\bin" >> $env:GITHUB_PATH
+      - name: Build release binary
+        shell: pwsh
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "1"
+          CC: C:\msys64\ucrt64\bin\gcc.exe
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          $commit = (git rev-parse HEAD)
+          $buildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+          Get-ChildItem $env:GITHUB_WORKSPACE -Filter "resource_windows_*.syso" -File | Remove-Item -Force -ErrorAction SilentlyContinue
+          goversioninfo.exe -64 -icon build/windows/icon.ico -manifest build/windows/manifest.xml -o resource_windows_amd64.syso -propagate-ver-strings build/windows/versioninfo.json
+          if ($LASTEXITCODE -ne 0) { throw "goversioninfo failed" }
+          $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=$env:RELEASE_VERSION -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -ldflags $ldflags -o dist/cmdr.exe .
+          if (-not (Test-Path dist/cmdr.exe) -or (Get-Item dist/cmdr.exe).Length -le 0) { throw "Invalid Windows binary" }
+          Remove-Item resource_windows_amd64.syso -Force -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-amd64
+          path: dist/cmdr.exe
+          if-no-files-found: error
+
+  linux-amd64:
+    name: Build Linux amd64 release
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.0"
+          cache: true
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc libc6-dev
+      - name: Build release binary
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: "1"
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          COMMIT=$(git rev-parse HEAD)
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X github.com/zerodayz7/cmdr/config.Version=$RELEASE_VERSION -X github.com/zerodayz7/cmdr/config.GitCommit=$COMMIT -X github.com/zerodayz7/cmdr/config.BuildDate=$BUILD_DATE" -o dist/cmdr .
+          test -s dist/cmdr
+          file dist/cmdr
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-amd64
+          path: dist/cmdr
+          if-no-files-found: error
+
+  publish:
+    name: Package and publish GitHub Release
+    needs: [validate, windows-amd64, linux-amd64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows-amd64
+          path: package/windows
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: release-linux-amd64
+          path: package/linux
+      - name: Package artifacts
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp package/windows/cmdr.exe README.md LICENSE dist/
+          cd dist
+          zip -q "cmdr_${VERSION}_windows_amd64.zip" cmdr.exe README.md LICENSE
+          rm -f cmdr.exe README.md LICENSE
+          cd ..
+          mkdir -p package/linux-release
+          cp package/linux/cmdr README.md LICENSE package/linux-release/
+          chmod 0755 package/linux-release/cmdr
+          tar -czf "dist/cmdr_${VERSION}_linux_amd64.tar.gz" -C package/linux-release cmdr README.md LICENSE
+          cd dist
+          sha256sum "cmdr_${VERSION}_windows_amd64.zip" "cmdr_${VERSION}_linux_amd64.tar.gz" > checksums.txt
+          cat checksums.txt
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          gh release create "v${VERSION}" dist/* \
+            --title "cmdr v${VERSION}" \
+            --generate-notes \
+            --verify-tag
