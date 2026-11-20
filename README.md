@@ -8,6 +8,8 @@ A fast, developer-friendly CLI for bootstrapping microservices and handy Go tool
 - [Prepare Password](./docs/PREPARE-PASSWORD.md)
 - [Tree Usage](./docs/TREE_USAGE.md)
 - [Assets](./docs/assets.md)
+- [Releasing](./docs/releasing.md)
+- [Updating](./docs/updating.md)
 
 ## Usage
 

@@ -1,0 +1,115 @@
+name: Test and build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+          cache: true
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./...
+
+  windows-amd64:
+    name: Windows amd64
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+          cache: true
+      - name: Install MinGW and goversioninfo
+        shell: pwsh
+        run: |
+          winget install --id MSYS2.MSYS2 -e --silent --accept-source-agreements --accept-package-agreements
+          C:\msys64\usr\bin\pacman.exe -Syu --noconfirm
+          C:\msys64\usr\bin\pacman.exe -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc
+          echo "C:\msys64\ucrt64\bin" >> $env:GITHUB_PATH
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.7.0
+          echo "C:\Users\runneradmin\go\bin" >> $env:GITHUB_PATH
+      - name: Build Windows amd64
+        shell: pwsh
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "1"
+          CC: C:\msys64\ucrt64\bin\gcc.exe
+        run: |
+          $commit = (git rev-parse HEAD)
+          $buildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+          $syso = Join-Path $env:GITHUB_WORKSPACE "resource_windows_amd64.syso"
+          Get-ChildItem $env:GITHUB_WORKSPACE -Filter "resource_windows_*.syso" -File | Remove-Item -Force -ErrorAction SilentlyContinue
+          goversioninfo.exe -64 -icon build/windows/icon.ico -manifest build/windows/manifest.xml -o $syso -propagate-ver-strings build/windows/versioninfo.json
+          if ($LASTEXITCODE -ne 0) { throw "goversioninfo failed" }
+          $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=2.1.4 -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -ldflags $ldflags -o dist/cmdr.exe .
+          if (-not (Test-Path dist/cmdr.exe)) { throw "Windows binary missing" }
+          Remove-Item $syso -Force -ErrorAction SilentlyContinue
+      - name: Verify Windows binary
+        shell: pwsh
+        run: |
+          $item = Get-Item dist/cmdr.exe
+          if ($item.Length -le 0) { throw "Windows binary is empty" }
+      - name: Upload Windows artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmdr-main-windows-amd64
+          path: dist/cmdr.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-amd64:
+    name: Linux amd64
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+          cache: true
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc libc6-dev
+      - name: Build Linux amd64
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: "1"
+        run: |
+          COMMIT=$(git rev-parse HEAD)
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X github.com/zerodayz7/cmdr/config.Version=2.1.4 -X github.com/zerodayz7/cmdr/config.GitCommit=$COMMIT -X github.com/zerodayz7/cmdr/config.BuildDate=$BUILD_DATE" -o dist/cmdr .
+          test -s dist/cmdr
+          file dist/cmdr
+      - name: Upload Linux artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmdr-main-linux-amd64
+          path: dist/cmdr
+          if-no-files-found: error
+          retention-days: 14

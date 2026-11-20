@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("amd64", "arm64", "all")]
+    [ValidateSet("amd64")]
     [string]$Arch = "amd64"
 )
 
@@ -99,25 +99,16 @@ $parts = Convert-VersionParts $version
 Write-VersionConfig $version
 Write-Manifest $version
 
-$architectures = if ($Arch -eq "all") { @("amd64", "arm64") } else { @($Arch) }
+$architectures = @("amd64")
 
 foreach ($targetArch in $architectures) {
-    if ($targetArch -eq "amd64") {
-        $compiler = Get-Command gcc -ErrorAction SilentlyContinue
-    } else {
-        $compiler = Get-Command aarch64-w64-mingw32-gcc -ErrorAction SilentlyContinue
-        if ($null -eq $compiler) {
-            throw "Windows arm64 cross-build requires aarch64-w64-mingw32-gcc in PATH."
-        }
-        $env:CC = $compiler.Source
-    }
+    $compiler = Get-Command gcc -ErrorAction SilentlyContinue
 
     Get-ChildItem -Path $root -Filter "resource_windows_*.syso" -File -ErrorAction SilentlyContinue |
         Remove-Item -Force
 
     $syso = Join-Path $root "resource_windows_$targetArch.syso"
     $extraArgs = @("-64")
-    if ($targetArch -eq "arm64") { $extraArgs += "-arm" }
 
     Write-Host "Generating Windows resource for $targetArch..."
     & $goversioninfo.Source @extraArgs "-icon" (Join-Path $root "build/windows/icon.ico") "-manifest" (Join-Path $root "build/windows/manifest.xml") "-o" $syso "-propagate-ver-strings" (Join-Path $root "build/windows/versioninfo.json")
@@ -128,12 +119,13 @@ foreach ($targetArch in $architectures) {
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     $output = Join-Path $outDir "cmdr.exe"
 
-    $env:GOOS = "windows"
-    $env:GOARCH = $targetArch
-    $env:CGO_ENABLED = "1"
+    $commit = (& git rev-parse HEAD 2>$null)
+    if (-not $commit) { $commit = "unknown" }
+    $buildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=$version -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
 
     Write-Host "Building cmdr $version for windows/$targetArch..."
-    & go build -trimpath -ldflags "-s -w" -o $output .
+    & go build -trimpath -ldflags $ldflags -o $output .
     if ($LASTEXITCODE -ne 0) { throw "Build failed for windows/$targetArch." }
     if (-not (Test-Path $output)) { throw "Build did not create $output" }
 
@@ -144,8 +136,12 @@ foreach ($targetArch in $architectures) {
     Remove-Item -Force $syso -ErrorAction SilentlyContinue
 }
 
+$env:GOOS = "windows"
+$env:GOARCH = "amd64"
+$env:CGO_ENABLED = "1"
+
 Remove-Variable env:GOOS -ErrorAction SilentlyContinue
 Remove-Variable env:GOARCH -ErrorAction SilentlyContinue
 Remove-Variable env:CGO_ENABLED -ErrorAction SilentlyContinue
 Remove-Variable env:CC -ErrorAction SilentlyContinue
-Get-ChildItem -Path $root -Filter "resource_windows_*.syso" -File -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem -Path $root -Filter "resource_windows_*.syso" -ErrorAction SilentlyContinue | Remove-Item -Force

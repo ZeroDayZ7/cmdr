@@ -5,7 +5,7 @@
     "**/go.sum": true,
     // "**/go.mod": true,
     "**/.gitattributes": true,
-    "**/.github": true,
+    // "**/.github": true,
     // "**/.gitignore": true,
     "**/bin/": true,
     // "**/README.md": true,
