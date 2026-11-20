@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestSafeArchivePathRejectsTraversal(t *testing.T) {
@@ -106,6 +107,45 @@ func TestExtractTarGzAcceptsExpectedFiles(t *testing.T) {
 	data, err := os.ReadFile(binary)
 	if err != nil || string(data) != "binary" {
 		t.Fatalf("binary = %q, %v", data, err)
+	}
+}
+
+func TestDownloadToFileWithProgress(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		_, _ = w.Write(make([]byte, 100))
+	}))
+	defer server.Close()
+	var calls int
+	var downloaded, total int64
+	err := DownloadToFileWithProgress(server.URL, filepath.Join(t.TempDir(), "archive"), 1024, func(d, t int64, _ time.Duration) {
+		calls++
+		downloaded, total = d, t
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls == 0 {
+		t.Fatal("progress callback was not called")
+	}
+	if downloaded != 100 || total != 100 {
+		t.Fatalf("progress = %d/%d", downloaded, total)
+	}
+}
+
+func TestDownloadToFileUnknownContentLength(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Transfer-Encoding", "chunked")
+		_, _ = w.Write([]byte("data"))
+	}))
+	defer server.Close()
+	var total int64 = -99
+	err := DownloadToFileWithProgress(server.URL, filepath.Join(t.TempDir(), "archive"), 1024, func(_, got int64, _ time.Duration) { total = got })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != -1 {
+		t.Fatalf("total = %d", total)
 	}
 }
 

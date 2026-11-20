@@ -24,7 +24,16 @@ cmdr update --version 2.1.5
 cmdr update --prerelease
 ```
 
-Stable releases are used by default. `--force` allows reinstall or downgrade. `--version` requires semantic versioning and stable release unless prereleases are explicitly accepted.
+Stable releases are used by default and prereleases are never selected accidentally.
+
+To test prereleases:
+
+```bash
+cmdr update --check --prerelease
+cmdr update --prerelease
+```
+
+Prerelease mode recognizes SemVer prerelease tags and is intended for the preferred `-rc.N` test format. It can progress from a prerelease to a newer prerelease or to a stable release. Prereleases are never exposed by ordinary `cmdr update`. Downgrades and reinstalls still require `--force`.
 
 ## Security
 

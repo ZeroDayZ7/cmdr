@@ -4,7 +4,7 @@ import "runtime"
 
 var (
 	Name      = "cmdr"
-	Version   = "2.1.5"
+	Version   = "2.1.6"
 	GitCommit = "unknown"
 	BuildDate = "unknown"
 	Contact   = "ZeroDayZ7@proton.me"

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/zerodayz7/cmdr/config"
@@ -22,6 +23,8 @@ func NewUpdateCmd() *cobra.Command {
 		Short: "Check for or install cmdr updates",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			updater.PrintStage(cmd.OutOrStdout(), "Checking for a newer version")
+
 			goos, goarch := updater.CurrentPlatform()
 			if goos != "windows" && goos != "linux" {
 				return fmt.Errorf("unsupported platform: %s/%s", goos, goarch)
@@ -34,14 +37,20 @@ func NewUpdateCmd() *cobra.Command {
 			var err error
 			if strings.TrimSpace(targetVersion) != "" {
 				version := strings.TrimSpace(targetVersion)
-				if _, prereleasePart, parseErr := updater.ParseVersion(version); parseErr != nil {
+				_, prereleasePart, parseErr := updater.ParseVersion(version)
+				if parseErr != nil {
 					return parseErr
-				} else if prereleasePart != "" {
+				}
+				if prereleasePart != "" && !prerelease {
 					return fmt.Errorf("pre-release versions require --prerelease")
 				}
 				version = strings.TrimPrefix(version, "v")
 				tag := "v" + version
-				release, err = updater.FetchReleaseByTag(tag)
+				if prerelease {
+					release, err = updater.FetchReleaseByTagAny(tag)
+				} else {
+					release, err = updater.FetchReleaseByTag(tag)
+				}
 			} else if prerelease {
 				release, err = updater.FetchLatestRelease(updater.ReleasesAPIURL, true)
 			} else {
@@ -52,9 +61,18 @@ func NewUpdateCmd() *cobra.Command {
 			}
 
 			latestTag := strings.TrimSpace(release.TagName)
-			latestVersion, err := updater.StableVersionTag(latestTag)
+			latestVersion, isPrerelease, err := updater.ReleaseVersionTag(latestTag)
 			if err != nil {
 				return err
+			}
+			if isPrerelease && !prerelease && strings.TrimSpace(targetVersion) == "" {
+				return fmt.Errorf("latest release is a pre-release; use --prerelease")
+			}
+			if isPrerelease != release.Prerelease {
+				return fmt.Errorf("release %s has inconsistent prerelease metadata", latestTag)
+			}
+			if release.Draft {
+				return fmt.Errorf("release %s has inconsistent release metadata", latestTag)
 			}
 			comparison, err := updater.CompareVersions(latestVersion, config.Version)
 			if err != nil {
@@ -102,15 +120,23 @@ func NewUpdateCmd() *cobra.Command {
 
 			archivePath := filepath.Join(working, asset.Name)
 			checksumPath := filepath.Join(working, "checksums.txt")
-			cmd.Println("Downloading...")
-			if err := updater.DownloadToFile(asset.BrowserDownloadURL, archivePath, updater.MaxArchiveBytes); err != nil {
+			updater.PrintStage(cmd.OutOrStdout(), "Downloading update")
+			progress := updater.NewProgressRenderer(cmd.OutOrStdout())
+			started := time.Now()
+			var downloaded int64
+			if err := updater.DownloadToFileWithProgress(asset.BrowserDownloadURL, archivePath, updater.MaxArchiveBytes, func(downloadedBytes, total int64, elapsed time.Duration) {
+				downloaded = downloadedBytes
+				progress.Render(updater.DownloadProgress{Downloaded: downloadedBytes, Total: total, Elapsed: elapsed})
+			}); err != nil {
+				progress.Abort(err.Error())
 				return err
 			}
+			progress.Finish(downloaded, time.Since(started))
 			if err := updater.DownloadToFile(checksumAsset.BrowserDownloadURL, checksumPath, 1<<20); err != nil {
 				return err
 			}
 
-			cmd.Println("Verifying checksum...")
+			updater.PrintStage(cmd.OutOrStdout(), "Verifying SHA-256 checksum")
 			checksumFile, err := os.Open(checksumPath)
 			if err != nil {
 				return err
@@ -147,12 +173,17 @@ func NewUpdateCmd() *cobra.Command {
 				return err
 			}
 
-			cmd.Println("Installing...")
+			updater.PrintStage(cmd.OutOrStdout(), "Installing update")
 			if err := updater.ApplyPlatformUpdate(currentPath, stagedPath); err != nil {
 				_ = os.Remove(stagedPath)
 				return err
 			}
-			cmd.Printf("Successfully updated cmdr to v%s.\n", latestVersion)
+			if goos == "windows" {
+				cmd.Println("Update helper is replacing cmdr.exe after this process exits.")
+				cmd.Println("If the update helper reports an error, run 'cmdr version' and inspect the update result.")
+				return nil
+			}
+			updater.PrintCompleted(cmd.OutOrStdout(), latestVersion)
 			return nil
 		},
 	}
