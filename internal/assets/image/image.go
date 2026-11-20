@@ -17,7 +17,6 @@ import (
 
 	"github.com/chai2010/webp"
 	xdraw "golang.org/x/image/draw"
-	"golang.org/x/sys/windows"
 )
 
 const (
@@ -336,25 +335,9 @@ func ReplaceFile(src, dst string, overwrite bool) error {
 	if renameErr == nil {
 		return nil
 	}
-	moveErr := windowsMoveFileEx(src, dst, overwrite)
+	moveErr := replaceFilePlatform(src, dst, overwrite)
 	if moveErr == nil {
 		return nil
 	}
-	return fmt.Errorf("replace file %s with %s: rename failed: %w; MoveFileEx failed: %v", src, dst, renameErr, moveErr)
-}
-
-func windowsMoveFileEx(src, dst string, overwrite bool) error {
-	srcPtr, err := windows.UTF16PtrFromString(src)
-	if err != nil {
-		return fmt.Errorf("convert source path %s to UTF-16: %w", src, err)
-	}
-	dstPtr, err := windows.UTF16PtrFromString(dst)
-	if err != nil {
-		return fmt.Errorf("convert destination path %s to UTF-16: %w", dst, err)
-	}
-	flags := uint32(windows.MOVEFILE_WRITE_THROUGH)
-	if overwrite {
-		flags |= windows.MOVEFILE_REPLACE_EXISTING
-	}
-	return windows.MoveFileEx(srcPtr, dstPtr, flags)
+	return fmt.Errorf("replace file %s with %s: rename failed: %w; platform replace failed: %v", src, dst, renameErr, moveErr)
 }

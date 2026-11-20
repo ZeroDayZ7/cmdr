@@ -148,11 +148,24 @@ func TestResizeRejectsInvalidDimensions(t *testing.T) {
 	}
 }
 
-func TestResizeRejectsUnsupportedFormat(t *testing.T) {
+func TestResizeSupportsWebPFormat(t *testing.T) {
 	src := filepath.Join(t.TempDir(), "source.png")
 	writeImageFile(t, src, image.NewNRGBA(image.Rect(0, 0, 32, 32)), "png")
-	if err := ResizeImage(src, filepath.Join(t.TempDir(), "out.webp"), 100, 100, "contain", false); err == nil {
-		t.Fatal("expected webp output to be rejected")
+	dst := filepath.Join(t.TempDir(), "out.webp")
+	if err := ResizeImage(src, dst, 100, 100, "contain", true); err != nil {
+		t.Fatalf("ResizeImage WebP returned error: %v", err)
+	}
+	f, err := os.Open(dst)
+	if err != nil {
+		t.Fatalf("open generated WebP: %v", err)
+	}
+	defer f.Close()
+	_, format, err := image.Decode(f)
+	if err != nil {
+		t.Fatalf("decode generated WebP: %v", err)
+	}
+	if format != "webp" {
+		t.Fatalf("decoded format = %q, want webp", format)
 	}
 }
 

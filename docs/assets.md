@@ -1,9 +1,10 @@
 # Assets command
 
-The `assets` command helps prepare image assets for web and application projects. It currently provides three subcommands:
+The `assets` command helps prepare image assets for web and application projects. It provides these subcommands:
 
 - `assets favicon` — generates a favicon set from a single source image
 - `assets resize` — resizes a source image to a target width and height
+- `assets convert` — converts an image between PNG, JPG/JPEG, GIF, and WebP
 - `assets config init` — creates the default asset configuration file
 
 The command group itself only displays help when run without a subcommand.
@@ -14,6 +15,7 @@ The command group itself only displays help when run without a subcommand.
 cmdr assets --help
 cmdr assets favicon --help
 cmdr assets resize --help
+cmdr assets convert --help
 cmdr assets config --help
 cmdr assets config init --help
 ```
@@ -85,8 +87,9 @@ cmdr assets resize -i ./source.png -o ./out/resized.gif -w 256 -H 256 --fit stre
 
 - The source and output path must differ; the command rejects identical paths.
 - The output format is inferred from the destination file extension.
-- Supported output formats are `png`, `jpg`, `jpeg`, and `gif`.
+- Supported output formats are `png`, `jpg`, `jpeg`, `gif`, and `webp`.
 - If the destination extension is `.jpg` or `.jpeg`, the command will handle alpha-containing input by compositing it over white before encoding.
+- WebP output preserves alpha and uses the shared WebP encoder.
 - If output file already exists and `--overwrite` is not provided, the command returns an error.
 
 ### Fit modes
@@ -94,6 +97,33 @@ cmdr assets resize -i ./source.png -o ./out/resized.gif -w 256 -H 256 --fit stre
 - `contain`: preserve aspect ratio and fit the image inside the target rectangle while keeping empty padding if needed
 - `cover`: preserve aspect ratio and cover the target rectangle without distortion
 - `stretch`: resize directly to the requested dimensions, potentially distorting the image
+
+## `assets convert`
+
+Converts an image to a supported destination format. The destination format is inferred from the output extension.
+
+### Usage
+
+```bash
+cmdr assets convert -i logo.png -o logo.webp
+cmdr assets convert -i photo.jpg -o photo.webp
+cmdr assets convert -i photo.webp -o photo.png
+cmdr assets convert -i photo.webp -o photo.jpg
+cmdr assets convert -i photo.png -o photo.webp --quality 85
+cmdr assets convert -i photo.png -o photo.webp --overwrite
+cmdr assets convert -i photo.png -o photo.webp --lossless
+```
+
+### Flags
+
+- `--input`, `-i`: required source image path
+- `--output`, `-o`: required destination image path
+- `--format`: optional explicit format; it must match the output extension
+- `--quality`, `-q`: WebP quality from 1 to 100; default 85
+- `--lossless`: encode WebP without loss
+- `--overwrite`: replace an existing output file
+
+`--quality` and `--lossless` are ignored by neither PNG/JPEG/GIF encoders: the command rejects those options for non-WebP output. PNG and WebP preserve transparency. JPEG and GIF output follow existing image composition behavior; JPEG alpha is composited on white. GIF input is decoded as a single frame and is not converted as an animated GIF/WebP.
 
 ## `assets config`
 
@@ -137,7 +167,7 @@ The generated file contains:
 }
 ```
 
-The config file is loaded with default values when it is missing. Supported default and preset formats are `png`, `jpg`, `jpeg`, and `gif`.
+The config file is loaded with default values when it is missing. Supported default and preset formats are `png`, `jpg`, `jpeg`, `gif`, and `webp`.
 
 ## Supported formats
 
@@ -147,11 +177,13 @@ The asset system accepts these output formats:
 - `jpg`
 - `jpeg`
 - `gif`
+- `webp`
 
-For `favicon`, the generated files are always PNG images. For `resize`, the destination extension determines the output format.
+For `favicon`, the generated files are always PNG images. For `resize`, the destination extension determines the output format. For `convert`, the output format is based on the specified output file extension.
 
 ## Notes
 
 - If `--sizes` is omitted for `assets favicon`, the command tries to use the configured `favicon` preset and falls back to the default list if no preset is available.
-- `assets` does not expose additional subcommands beyond `favicon`, `resize`, and `config init`.
-- When the command writes files, it protects against accidental overwrite by requiring `--overwrite` for existing files unless the operation is explicitly allowed by the command logic.
+- `assets` exposes `favicon`, `resize`, `convert`, and `config init` subcommands.
+- When a command writes files, it protects against accidental overwrite by requiring `--overwrite` for existing files unless the operation is explicitly allowed by the command logic.
+- GIF decoding uses the existing single-image decoder. Animated GIF frames are not preserved as animated WebP or other animated output.

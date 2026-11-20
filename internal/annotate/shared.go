@@ -145,7 +145,7 @@ func IsBinary(data []byte) bool {
 	return !utf8.Valid(data[:limit])
 }
 
-//#region HasAnnotation
+// #region HasAnnotation
 func HasAnnotation(content string) bool {
 	lines := strings.SplitN(content, "\n", 3)
 	if len(lines) == 0 {
