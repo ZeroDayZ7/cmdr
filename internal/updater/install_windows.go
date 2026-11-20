@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -18,6 +20,7 @@ var closeUpdateProcessHandle = windows.CloseHandle
 var replaceUpdateExecutable = replaceMoveFileEx
 var renameUpdateFile = os.Rename
 var waitUpdateProcessExit = waitForProcessExit
+var startUpdateHelperProcess = startDetachedWindowsHelper
 
 func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 	resultPath := currentPath + ".cmdr-update.result"
@@ -44,12 +47,11 @@ func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 	if err := writeUpdateResult(resultPath, "pending"); err != nil {
 		return err
 	}
-	process, err := os.StartProcess(helper, []string{helper, "update-helper",
+	process, err := startUpdateHelperProcess(helper, []string{helper, "update-helper",
 		"--target", currentPath,
 		"--staged", stagedPath,
 		"--result", resultPath,
-		"--pid", fmt.Sprintf("%d", os.Getpid())},
-		&os.ProcAttr{Files: []*os.File{os.Stdin, os.Stdout, os.Stderr}, Dir: filepath.Dir(helper)})
+		"--pid", fmt.Sprintf("%d", os.Getpid())})
 	if err != nil {
 		message := fmt.Sprintf("error: start Windows update helper %q: %v", helper, err)
 		if statusErr := writeUpdateResult(resultPath, message); statusErr != nil {
@@ -245,4 +247,77 @@ func createUniqueBackupPath(target string) (string, error) {
 		backup = filepath.Join(dir, fmt.Sprintf("%s-%s-%d%s", name, timestamp, i, ext))
 		i++
 	}
+}
+
+func startDetachedWindowsHelper(helper string, args []string) (*os.Process, error) {
+	application, err := windows.UTF16PtrFromString(helper)
+	if err != nil {
+		return nil, err
+	}
+	commandLine, err := windows.UTF16PtrFromString(formatWindowsCommandLine(args))
+	if err != nil {
+		return nil, err
+	}
+
+	nul, err := windows.UTF16PtrFromString("NUL")
+	if err != nil {
+		return nil, err
+	}
+	nulHandle, err := windows.CreateFile(nul, windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer windows.CloseHandle(nulHandle)
+
+	startup := windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{})), StdInput: nulHandle, StdOutput: nulHandle, StdErr: nulHandle}
+	startup.Flags = windows.STARTF_USESTDHANDLES
+	var processInfo windows.ProcessInformation
+	workingDir, err := windows.UTF16PtrFromString(filepath.Dir(helper))
+	if err != nil {
+		return nil, err
+	}
+	if err := windows.CreateProcess(application, commandLine, nil, nil, true,
+		windows.DETACHED_PROCESS|windows.CREATE_NEW_PROCESS_GROUP,
+		nil, workingDir, &startup, &processInfo); err != nil {
+		return nil, err
+	}
+	_ = windows.CloseHandle(processInfo.Thread)
+	_ = windows.CloseHandle(processInfo.Process)
+	return os.FindProcess(int(processInfo.ProcessId))
+}
+
+func formatWindowsCommandLine(args []string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = windowsQuoteArgument(arg)
+	}
+	return strings.Join(quoted, " ")
+}
+
+func windowsQuoteArgument(value string) string {
+	if value != "" && !strings.ContainsAny(value, " \t\n\r\"") {
+		return value
+	}
+	var result strings.Builder
+	result.WriteByte('"')
+	for i := 0; i < len(value); i++ {
+		backslashes := 0
+		for i < len(value) && value[i] == '\\' {
+			backslashes++
+			i++
+		}
+		if i == len(value) {
+			result.WriteString(strings.Repeat("\\\\", backslashes))
+			break
+		}
+		if value[i] == '"' {
+			result.WriteString(strings.Repeat("\\\\", backslashes))
+			result.WriteString("\\\"")
+		} else {
+			result.WriteString(strings.Repeat("\\", backslashes))
+			result.WriteByte(value[i])
+		}
+	}
+	result.WriteByte('"')
+	return result.String()
 }

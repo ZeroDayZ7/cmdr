@@ -71,3 +71,43 @@ func TestProgressRendererUnknownAndNOColor(t *testing.T) {
 		t.Fatal("ANSI escape found")
 	}
 }
+
+func TestProgressBar(t *testing.T) {
+	if got := progressBar(0); got != "[------------------------]" {
+		t.Fatalf("0%% = %q", got)
+	}
+	if got := progressBar(50); got != "[============------------]" {
+		t.Fatalf("50%% = %q", got)
+	}
+	if got := progressBar(100); got != "[========================]" {
+		t.Fatalf("100%% = %q", got)
+	}
+}
+
+func TestProgressRendererInteractiveSingleLine(t *testing.T) {
+	var out bytes.Buffer
+	r := NewProgressRenderer(&out)
+	r.interactive = true
+	r.color = false
+	r.Render(DownloadProgress{Downloaded: 1600, Total: 3900, Elapsed: time.Second})
+	text := out.String()
+	if !bytes.Contains(out.Bytes(), []byte("\rDownloading: [")) {
+		t.Fatalf("missing carriage return: %q", text)
+	}
+	if bytes.Contains(out.Bytes(), []byte("\n")) {
+		t.Fatalf("progress contains newline: %q", text)
+	}
+	if !bytes.Contains(out.Bytes(), []byte("41%")) {
+		t.Fatalf("missing percentage: %q", text)
+	}
+}
+
+func TestProgressRendererFinishSingleLine(t *testing.T) {
+	var out bytes.Buffer
+	r := NewProgressRenderer(&out)
+	r.interactive = true
+	r.Finish(3900, 3*time.Second)
+	if !bytes.HasSuffix(out.Bytes(), []byte("\n")) {
+		t.Fatalf("finish did not end with newline: %q", out.String())
+	}
+}

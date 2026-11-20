@@ -98,7 +98,7 @@ func terminalInteractive(w io.Writer) bool {
 		return false
 	}
 	if runtime.GOOS == "windows" {
-		return os.Getenv("WT_SESSION") != "" || os.Getenv("ANSICON") != "" || strings.EqualFold(os.Getenv("ConEmuANSI"), "ON") || strings.Contains(strings.ToLower(os.Getenv("TERM")), "ansi") || strings.Contains(strings.ToLower(os.Getenv("TERM")), "xterm")
+		return true
 	}
 	term := strings.ToLower(os.Getenv("TERM"))
 	return term != "" && term != "dumb"
@@ -138,23 +138,24 @@ func (p *ProgressRenderer) Render(progress DownloadProgress) {
 		percentage := ProgressPercentage(progress.Downloaded, progress.Total)
 		bar := progressBar(percentage)
 		speed := DownloadSpeed(progress.Downloaded, progress.Elapsed)
-		fmt.Fprintf(p.w, "\r\033[K%s", "Downloading ")
+		fmt.Fprint(p.w, "\rDownloading: ")
 		if p.color {
-			fmt.Fprintf(p.w, "\033[38;2;163;230;53m")
+			fmt.Fprint(p.w, "\033[38;2;163;230;53m")
 		}
-		fmt.Fprintf(p.w, "%s", bar)
+		fmt.Fprint(p.w, bar)
 		if p.color {
 			fmt.Fprint(p.w, "\033[0m")
 		}
 		if percentage >= 0 {
-			fmt.Fprintf(p.w, "  %3d%%", percentage)
+			fmt.Fprintf(p.w, " %3d%%", percentage)
 		}
 		fmt.Fprintf(p.w, "  %s / %s", FormatBytes(progress.Downloaded), formatProgressTotal(progress.Total))
 		fmt.Fprintf(p.w, "  %.1f MB/s", speed/(1024*1024))
 		if eta := DownloadETA(progress.Downloaded, progress.Total, progress.Elapsed); eta >= 0 {
 			fmt.Fprintf(p.w, "  ETA: %s", formatDuration(eta))
 		}
-		fmt.Fprintf(p.w, "  elapsed: %s", formatDuration(progress.Elapsed))
+		fmt.Fprint(p.w, "\033[K")
+		flushProgressWriter(p.w)
 		return
 	}
 
@@ -166,6 +167,7 @@ func (p *ProgressRenderer) Render(progress DownloadProgress) {
 		} else {
 			fmt.Fprintf(p.w, "Downloading: %s\n", FormatBytes(progress.Downloaded))
 		}
+		flushProgressWriter(p.w)
 	}
 }
 
@@ -178,6 +180,7 @@ func (p *ProgressRenderer) Finish(downloaded int64, elapsed time.Duration) {
 	}
 	speed := DownloadSpeed(downloaded, elapsed)
 	fmt.Fprintf(p.w, "Downloaded %s in %s (%.1f MB/s)\n", FormatBytes(downloaded), formatDuration(elapsed), speed/(1024*1024))
+	flushProgressWriter(p.w)
 }
 
 func (p *ProgressRenderer) Abort(reason string) {
@@ -188,6 +191,7 @@ func (p *ProgressRenderer) Abort(reason string) {
 		fmt.Fprint(p.w, "\r\033[K")
 	}
 	fmt.Fprintf(p.w, "Download stopped: %s\n", reason)
+	flushProgressWriter(p.w)
 }
 
 func progressBar(percentage int) string {
@@ -243,4 +247,13 @@ func PrintCompleted(w io.Writer, version string) {
 		green, reset = "\033[38;2;163;230;53m", "\033[0m"
 	}
 	fmt.Fprintf(w, "%s[✓]%s Completed: cmdr updated to v%s.\n", green, reset, version)
+}
+
+func flushProgressWriter(w io.Writer) {
+	if flusher, ok := w.(interface{ Flush() error }); ok {
+		_ = flusher.Flush()
+	}
+	if flusher, ok := w.(interface{ Flush() }); ok {
+		flusher.Flush()
+	}
 }

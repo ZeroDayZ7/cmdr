@@ -211,3 +211,13 @@ func TestWaitForProcessExitAccessDenied(t *testing.T) {
 		t.Fatal("expected access denied to block replacement")
 	}
 }
+
+func TestFormatWindowsCommandLine(t *testing.T) {
+	line := formatWindowsCommandLine([]string{"C:\\Program Files\\cmdr\\cmdr.exe", "update-helper", "--target", "C:\\Program Files\\cmdr\\cmdr.exe"})
+	if !strings.Contains(line, `"C:\Program Files\cmdr\cmdr.exe"`) {
+		t.Fatalf("command line missing quoted executable: %s", line)
+	}
+	if !strings.Contains(line, "update-helper") {
+		t.Fatalf("command line missing helper: %s", line)
+	}
+}
