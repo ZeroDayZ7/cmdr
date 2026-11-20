@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
           STABLE_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-          PRERELEASE_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.(0|[1-9][0-9]*)$'
+          PRERELEASE_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$'
           if [[ "$TAG" =~ $STABLE_RE ]]; then
             VERSION="${TAG#v}"
             PRERELEASE="false"
@@ -35,10 +35,9 @@ jobs:
             echo "Invalid release tag: $TAG" >&2
             exit 1
           fi
-          PROJECT_VERSION=$(sed -n 's/^.*Version[[:space:]]*=[[:space:]]*"\([^"]*\)".*$/\1/p' config/metadata.go | head -1)
-          if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
-            echo "Tag version $VERSION does not match config.Version $PROJECT_VERSION" >&2
-            exit 1
+          PROJECT_VERSION=$(sed -n 's/^.*Version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' config/metadata.go | head -1)
+          if [[ -n "$PROJECT_VERSION" ]]; then
+            echo "Building tag version $VERSION (local config default: $PROJECT_VERSION)" >&2
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
@@ -88,6 +87,25 @@ jobs:
           $commit = (git rev-parse HEAD)
           $buildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
           Get-ChildItem $env:GITHUB_WORKSPACE -Filter "resource_windows_*.syso" -File | Remove-Item -Force -ErrorAction SilentlyContinue
+          $numericCore = ($env:RELEASE_VERSION -split '-', 2)[0]
+          $parts = $numericCore.Split('.')
+          $major = [int]$parts[0]
+          $minor = [int]$parts[1]
+          $patch = [int]$parts[2]
+          $versionJson = Get-Content -Raw build/windows/versioninfo.json | ConvertFrom-Json
+          $versionJson.StringFileInfo.FileVersion = $numericCore
+          $versionJson.StringFileInfo.ProductVersion = $env:RELEASE_VERSION
+          foreach ($field in @($versionJson.FixedFileInfo.FileVersion, $versionJson.FixedFileInfo.ProductVersion)) {
+            $field.Major = $major
+            $field.Minor = $minor
+            $field.Patch = $patch
+            $field.Build = 0
+          }
+          $versionJson | ConvertTo-Json -Depth 10 | Set-Content -NoNewline build/windows/versioninfo.json
+          $assemblyVersion = "$major.$minor.$patch.0"
+          $manifest = Get-Content -Raw build/windows/manifest.xml
+          $manifest = $manifest -replace '(<assemblyIdentity[^>]*\bversion=")[^"]*(")', '${1}' + $assemblyVersion + '${2}'
+          Set-Content -NoNewline build/windows/manifest.xml $manifest
           goversioninfo.exe -64 -icon build/windows/icon.ico -manifest build/windows/manifest.xml -o resource_windows_amd64.syso -propagate-ver-strings build/windows/versioninfo.json
           if ($LASTEXITCODE -ne 0) { throw "goversioninfo failed" }
           $ldflags = "-s -w -X github.com/zerodayz7/cmdr/config.Version=$env:RELEASE_VERSION -X github.com/zerodayz7/cmdr/config.GitCommit=$commit -X github.com/zerodayz7/cmdr/config.BuildDate=$buildDate"
