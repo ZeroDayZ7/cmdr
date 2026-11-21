@@ -9,6 +9,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(cmdr-inspector
     src/main.cpp
     src/cli/help.cpp
+    src/file/file_inspector.cpp
+    src/file/file_type.cpp
 )
 
 target_include_directories(cmdr-inspector PRIVATE
