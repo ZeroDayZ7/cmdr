@@ -350,6 +350,37 @@ int main(int argc, char* argv[]) {
         requireStdout(result, "Extension: .jpg");
         requireStdout(result, "Warning: Extension does not match detected format.");
 
+        result = runProcess(executable, {"file", (samples / "sample.webp").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: WebP");
+        requireStdout(result, "Extension: .webp");
+
+        result = runProcess(executable, {"file", (samples / "sample.wav").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: WAV");
+        requireStdout(result, "Extension: .wav");
+
+        result = runProcess(executable, {"file", (samples / "sample.ogg").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: OGG");
+
+        result = runProcess(executable, {"file", (samples / "sample.flac").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: FLAC");
+
+        result = runProcess(executable, {"file", (samples / "sample.sqlite").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: SQLite");
+        requireStdout(result, "Extension: .sqlite");
+
+        result = runProcess(executable, {"file", (samples / "riff-only.bin").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: Unknown");
+
+        result = runProcess(executable, {"file", (samples / "riff-wrong.bin").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: Unknown");
+
         result = runProcess(executable, {"file", (samples / "png-unknown.xyz").string()});
         requireExit(result, 0);
         requireStdout(result, "Detected format: PNG");

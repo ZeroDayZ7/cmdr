@@ -35,7 +35,8 @@ bool isKnownExtension(const std::string& extension) {
         ".png", ".jpg", ".jpeg", ".jpe",
         ".gif", ".gif87a", ".gif89a",
         ".pdf", ".zip", ".gz", ".gzip", ".tgz",
-        ".rar", ".7z", ".bmp"
+        ".rar", ".7z", ".bmp",
+        ".webp", ".wav", ".ogg", ".flac", ".sqlite", ".db"
     });
 }
 
@@ -98,6 +99,26 @@ ExtensionCheck checkExtension(
         }
     } else if (detectedFormat == "BMP") {
         if (containsExtension(extension, {".bmp"})) {
+            return ExtensionCheck{extension, ExtensionStatus::Match};
+        }
+    } else if (detectedFormat == "WebP") {
+        if (containsExtension(extension, {".webp"})) {
+            return ExtensionCheck{extension, ExtensionStatus::Match};
+        }
+    } else if (detectedFormat == "WAV") {
+        if (containsExtension(extension, {".wav"})) {
+            return ExtensionCheck{extension, ExtensionStatus::Match};
+        }
+    } else if (detectedFormat == "OGG") {
+        if (containsExtension(extension, {".ogg"})) {
+            return ExtensionCheck{extension, ExtensionStatus::Match};
+        }
+    } else if (detectedFormat == "FLAC") {
+        if (containsExtension(extension, {".flac"})) {
+            return ExtensionCheck{extension, ExtensionStatus::Match};
+        }
+    } else if (detectedFormat == "SQLite") {
+        if (containsExtension(extension, {".sqlite", ".db"})) {
             return ExtensionCheck{extension, ExtensionStatus::Match};
         }
     }

@@ -31,6 +31,22 @@ Extract the archive and make the `cmdr` executable available in your system PATH
 
 ## Usage
 
+### CMD-R Inspector
+
+CMD-R Inspector is a standalone C++ program that inspects basic file information using binary signatures.
+
+Display inspector help:
+
+```bash
+cmdr-inspector --help
+```
+
+Inspect a file:
+
+```bash
+cmdr-inspector file "C:/Files/my document.pdf"
+```
+
 Display the main help:
 
 ```bash

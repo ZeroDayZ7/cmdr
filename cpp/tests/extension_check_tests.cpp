@@ -35,6 +35,14 @@ int main() {
         requireStatus("photo.jpg", "JPEG", cmdr::file::ExtensionStatus::Match);
         requireStatus("photo.jpeg", "JPEG", cmdr::file::ExtensionStatus::Match);
         requireStatus("photo.pdf", "PDF", cmdr::file::ExtensionStatus::Match);
+        requireStatus("photo.webp", "WebP", cmdr::file::ExtensionStatus::Match);
+        requireStatus("audio.wav", "WAV", cmdr::file::ExtensionStatus::Match);
+        requireStatus("audio.ogg", "OGG", cmdr::file::ExtensionStatus::Match);
+        requireStatus("audio.flac", "FLAC", cmdr::file::ExtensionStatus::Match);
+        requireStatus("database.sqlite", "SQLite", cmdr::file::ExtensionStatus::Match);
+        requireStatus("database.db", "SQLite", cmdr::file::ExtensionStatus::Match);
+
+        requireStatus("photo.png", "WAV", cmdr::file::ExtensionStatus::KnownMismatch);
 
         requireStatus("photo", "PNG", cmdr::file::ExtensionStatus::NoExtension);
         requireStatus("photo.custom", "PNG", cmdr::file::ExtensionStatus::UnknownExtension);
