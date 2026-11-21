@@ -1,6 +1,7 @@
 #include "cli/help.hpp"
 #include "file/file_inspector.hpp"
 #include "file/file_type.hpp"
+#include "file/extension_check.hpp"
 
 #include <filesystem>
 #include <iomanip>
@@ -55,8 +56,27 @@ int main(int argc, char* argv[]) {
             }
 
             std::cout << '\n';
-            std::cout << "Detected format: "
-                      << cmdr::file::detectFileType(info) << '\n';
+            const std::string_view detectedFormat =
+                cmdr::file::detectFileType(info);
+            const cmdr::file::ExtensionCheck extensionCheck =
+                cmdr::file::checkExtension(path, detectedFormat);
+
+            std::cout << "Detected format: " << detectedFormat << '\n';
+
+            if (extensionCheck.status == cmdr::file::ExtensionStatus::NoExtension) {
+                std::cout << "Extension: (none)\n";
+            } else {
+                std::cout << "Extension: " << extensionCheck.extension << '\n';
+            }
+
+            if (extensionCheck.status == cmdr::file::ExtensionStatus::Match) {
+                std::cout << "Extension matches detected format.\n";
+            } else if (extensionCheck.status == cmdr::file::ExtensionStatus::KnownMismatch) {
+                std::cout << "Warning: Extension does not match detected format.\n";
+            } else if (extensionCheck.status == cmdr::file::ExtensionStatus::UnknownExtension) {
+                std::cout << "Extension: unknown for detected format.\n";
+            }
+
             return 0;
         }
 

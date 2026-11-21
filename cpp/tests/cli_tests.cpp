@@ -344,6 +344,22 @@ int main(int argc, char* argv[]) {
         requireExit(result, 2);
         requireStderr(result, "Too many arguments");
 
+        result = runProcess(executable, {"file", (samples / "png-as-jpg.jpg").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: PNG");
+        requireStdout(result, "Extension: .jpg");
+        requireStdout(result, "Warning: Extension does not match detected format.");
+
+        result = runProcess(executable, {"file", (samples / "png-unknown.xyz").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: PNG");
+        requireStdout(result, "Extension: .xyz");
+
+        result = runProcess(executable, {"file", (samples / "noextension").string()});
+        requireExit(result, 0);
+        requireStdout(result, "Detected format: PNG");
+        requireStdout(result, "Extension: (none)");
+
         std::cout << "cli_tests: all integration checks passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
