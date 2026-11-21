@@ -28,3 +28,37 @@ if(MSVC)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(cmdr-inspector PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(file_type_tests
+        tests/file_type_tests.cpp
+        src/file/file_type.cpp
+    )
+    target_include_directories(file_type_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+
+    add_executable(file_inspector_tests
+        tests/file_inspector_tests.cpp
+        src/file/file_inspector.cpp
+    )
+    target_include_directories(file_inspector_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+
+    add_executable(cli_tests
+        tests/cli_tests.cpp
+    )
+    target_include_directories(cli_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+
+    add_test(NAME file_type_tests COMMAND file_type_tests)
+    add_test(NAME file_inspector_tests COMMAND file_inspector_tests)
+    add_test(NAME cli_tests COMMAND cli_tests
+        "$<TARGET_FILE:cmdr-inspector>"
+        "${CMAKE_CURRENT_SOURCE_DIR}/test-data/samples"
+    )
+endif()
