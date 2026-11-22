@@ -2,9 +2,29 @@
 
 #include <filesystem>
 #include <string>
-#include <string_view>
 
 namespace cmdr::file {
+
+enum class FileFormat {
+    Unknown,
+    ELF,
+    DOSWindowsMZ,
+    PNG,
+    JPEG,
+    GIF87a,
+    GIF89a,
+    PDF,
+    ZIP,
+    GZIP,
+    RAR,
+    SevenZip,
+    BMP,
+    WebP,
+    WAV,
+    OGG,
+    FLAC,
+    SQLite
+};
 
 enum class ExtensionStatus {
     Match,
@@ -21,7 +41,7 @@ struct ExtensionCheck {
 
 ExtensionCheck checkExtension(
     const std::filesystem::path& path,
-    std::string_view detectedFormat
+    FileFormat detectedFormat
 );
 
 } // namespace cmdr::file

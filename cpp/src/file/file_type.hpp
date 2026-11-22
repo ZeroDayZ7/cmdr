@@ -1,11 +1,13 @@
 #pragma once
 
+#include "file/extension_check.hpp"
 #include "file/file_inspector.hpp"
 
 #include <string_view>
 
 namespace cmdr::file {
 
-std::string_view detectFileType(const FileInfo& info);
+FileFormat detectFileType(const FileInfo& info);
+std::string_view fileFormatName(FileFormat format);
 
 } // namespace cmdr::file

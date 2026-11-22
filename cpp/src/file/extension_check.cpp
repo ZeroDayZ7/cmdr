@@ -1,7 +1,6 @@
 #include "file/extension_check.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <initializer_list>
 #include <string>
@@ -44,7 +43,7 @@ bool isKnownExtension(const std::string& extension) {
 
 ExtensionCheck checkExtension(
     const std::filesystem::path& path,
-    std::string_view detectedFormat
+    FileFormat detectedFormat
 ) {
     std::filesystem::path extensionPath = path.extension();
     if (extensionPath.empty()) {
@@ -53,74 +52,94 @@ ExtensionCheck checkExtension(
 
     std::string extension = toLowerAscii(extensionPath.string());
 
-    if (detectedFormat == "Unknown") {
+    if (detectedFormat == FileFormat::Unknown) {
         return ExtensionCheck{extension, ExtensionStatus::UnknownFormat};
     }
 
-    if (detectedFormat == "ELF") {
-        if (containsExtension(extension, {".elf"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "DOS/Windows MZ executable") {
-        if (containsExtension(extension, {".exe", ".com", ".dll", ".sys", ".drv"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "PNG") {
-        if (containsExtension(extension, {".png"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "JPEG") {
-        if (containsExtension(extension, {".jpg", ".jpeg", ".jpe"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "GIF87a" || detectedFormat == "GIF89a") {
-        if (containsExtension(extension, {".gif", ".gif87a", ".gif89a"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "PDF") {
-        if (containsExtension(extension, {".pdf"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "ZIP") {
-        if (containsExtension(extension, {".zip"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "GZIP") {
-        if (containsExtension(extension, {".gz", ".gzip", ".tgz"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "RAR") {
-        if (containsExtension(extension, {".rar"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "7-Zip") {
-        if (containsExtension(extension, {".7z"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "BMP") {
-        if (containsExtension(extension, {".bmp"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "WebP") {
-        if (containsExtension(extension, {".webp"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "WAV") {
-        if (containsExtension(extension, {".wav"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "OGG") {
-        if (containsExtension(extension, {".ogg"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "FLAC") {
-        if (containsExtension(extension, {".flac"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
-    } else if (detectedFormat == "SQLite") {
-        if (containsExtension(extension, {".sqlite", ".db"})) {
-            return ExtensionCheck{extension, ExtensionStatus::Match};
-        }
+    switch (detectedFormat) {
+        case FileFormat::ELF:
+            if (containsExtension(extension, {".elf"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::DOSWindowsMZ:
+            if (containsExtension(extension, {".exe", ".com", ".dll", ".sys", ".drv"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::PNG:
+            if (containsExtension(extension, {".png"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::JPEG:
+            if (containsExtension(extension, {".jpg", ".jpeg", ".jpe"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::GIF87a:
+        case FileFormat::GIF89a:
+            if (containsExtension(extension, {".gif", ".gif87a", ".gif89a"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::PDF:
+            if (containsExtension(extension, {".pdf"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::ZIP:
+            if (containsExtension(extension, {".zip"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::GZIP:
+            if (containsExtension(extension, {".gz", ".gzip", ".tgz"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::RAR:
+            if (containsExtension(extension, {".rar"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::SevenZip:
+            if (containsExtension(extension, {".7z"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::BMP:
+            if (containsExtension(extension, {".bmp"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::WebP:
+            if (containsExtension(extension, {".webp"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::WAV:
+            if (containsExtension(extension, {".wav"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::OGG:
+            if (containsExtension(extension, {".ogg"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::FLAC:
+            if (containsExtension(extension, {".flac"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::SQLite:
+            if (containsExtension(extension, {".sqlite", ".db"})) {
+                return ExtensionCheck{extension, ExtensionStatus::Match};
+            }
+            break;
+        case FileFormat::Unknown:
+            break;
     }
 
     if (isKnownExtension(extension)) {

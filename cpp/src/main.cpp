@@ -56,12 +56,13 @@ int main(int argc, char* argv[]) {
             }
 
             std::cout << '\n';
-            const std::string_view detectedFormat =
+            const cmdr::file::FileFormat detectedFormat =
                 cmdr::file::detectFileType(info);
             const cmdr::file::ExtensionCheck extensionCheck =
                 cmdr::file::checkExtension(path, detectedFormat);
 
-            std::cout << "Detected format: " << detectedFormat << '\n';
+            std::cout << "Detected format: "
+                      << cmdr::file::fileFormatName(detectedFormat) << '\n';
 
             if (extensionCheck.status == cmdr::file::ExtensionStatus::NoExtension) {
                 std::cout << "Extension: (none)\n";
