@@ -12,6 +12,7 @@ add_executable(cmdr-inspector
     src/file/file_inspector.cpp
     src/file/file_type.cpp
     src/file/extension_check.cpp
+    src/file/file_analysis.cpp
 )
 
 target_include_directories(cmdr-inspector PRIVATE
@@ -64,6 +65,17 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
     )
 
+    add_executable(file_analysis_tests
+        tests/file_analysis_tests.cpp
+        src/file/file_inspector.cpp
+        src/file/file_type.cpp
+        src/file/extension_check.cpp
+        src/file/file_analysis.cpp
+    )
+    target_include_directories(file_analysis_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+
     add_test(NAME file_type_tests COMMAND file_type_tests)
     add_test(NAME file_inspector_tests COMMAND file_inspector_tests)
     add_test(NAME extension_check_tests COMMAND extension_check_tests)
@@ -71,4 +83,5 @@ if(BUILD_TESTING)
         "$<TARGET_FILE:cmdr-inspector>"
         "${CMAKE_CURRENT_SOURCE_DIR}/test-data/samples"
     )
+    add_test(NAME file_analysis_tests COMMAND file_analysis_tests)
 endif()

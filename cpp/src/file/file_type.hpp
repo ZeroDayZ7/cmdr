@@ -1,6 +1,6 @@
 #pragma once
 
-#include "file/extension_check.hpp"
+#include "file/file_format.hpp"
 #include "file/file_inspector.hpp"
 
 #include <string_view>

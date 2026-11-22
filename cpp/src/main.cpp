@@ -1,7 +1,6 @@
 #include "cli/help.hpp"
-#include "file/file_inspector.hpp"
+#include "file/file_analysis.hpp"
 #include "file/file_type.hpp"
-#include "file/extension_check.hpp"
 
 #include <filesystem>
 #include <iomanip>
@@ -33,13 +32,15 @@ int main(int argc, char* argv[]) {
 
         if (command == "file") {
             const std::filesystem::path path(argv[2]);
-            cmdr::file::FileInfo info{std::string{}, 0};
-            std::string errorMessage;
+            const cmdr::file::FileAnalysisResult result =
+                cmdr::file::analyzeFile(path);
 
-            if (!cmdr::file::inspectFile(path, info, errorMessage)) {
-                std::cerr << errorMessage << '\n';
+            if (!result.success) {
+                std::cerr << result.errorMessage << '\n';
                 return 1;
             }
+
+            const cmdr::file::FileInfo& info = result.info;
 
             std::cout << "File name: " << info.name << '\n';
             std::cout << "Size: " << info.sizeBytes << " bytes\n";
@@ -56,25 +57,20 @@ int main(int argc, char* argv[]) {
             }
 
             std::cout << '\n';
-            const cmdr::file::FileFormat detectedFormat =
-                cmdr::file::detectFileType(info);
-            const cmdr::file::ExtensionCheck extensionCheck =
-                cmdr::file::checkExtension(path, detectedFormat);
-
             std::cout << "Detected format: "
-                      << cmdr::file::fileFormatName(detectedFormat) << '\n';
+                      << cmdr::file::fileFormatName(result.format) << '\n';
 
-            if (extensionCheck.status == cmdr::file::ExtensionStatus::NoExtension) {
+            if (result.extensionCheck.status == cmdr::file::ExtensionStatus::NoExtension) {
                 std::cout << "Extension: (none)\n";
             } else {
-                std::cout << "Extension: " << extensionCheck.extension << '\n';
+                std::cout << "Extension: " << result.extensionCheck.extension << '\n';
             }
 
-            if (extensionCheck.status == cmdr::file::ExtensionStatus::Match) {
+            if (result.extensionCheck.status == cmdr::file::ExtensionStatus::Match) {
                 std::cout << "Extension matches detected format.\n";
-            } else if (extensionCheck.status == cmdr::file::ExtensionStatus::KnownMismatch) {
+            } else if (result.extensionCheck.status == cmdr::file::ExtensionStatus::KnownMismatch) {
                 std::cout << "Warning: Extension does not match detected format.\n";
-            } else if (extensionCheck.status == cmdr::file::ExtensionStatus::UnknownExtension) {
+            } else if (result.extensionCheck.status == cmdr::file::ExtensionStatus::UnknownExtension) {
                 std::cout << "Extension: unknown for detected format.\n";
             }
 
