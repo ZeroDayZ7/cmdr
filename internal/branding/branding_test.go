@@ -27,8 +27,8 @@ func TestSupportsColorRejectsRedirect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer read.Close()
-	defer write.Close()
+	defer func() { _ = read.Close() }()
+	defer func() { _ = write.Close() }()
 	if SupportsColor(write) {
 		t.Fatal("pipe should not be detected as a color-capable terminal")
 	}

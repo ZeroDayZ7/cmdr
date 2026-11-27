@@ -234,7 +234,7 @@ func (c *Client) EffectiveAPIKey(cfg Config) (string, error) {
 		key = strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
 	}
 	if key == "" {
-		return "", errors.New("Gemini API key is missing; set apiKey in ~/.cmdr/.config.json or export GEMINI_API_KEY")
+		return "", errors.New("gemini API key is missing; set apiKey in ~/.cmdr/.config.json or export GEMINI_API_KEY")
 	}
 	return key, nil
 }
@@ -256,7 +256,7 @@ func (c *Client) ListModels(ctx context.Context, cfg Config, refresh bool) ([]Mo
 		return nil, err
 	}
 	if len(models) == 0 {
-		return nil, errors.New("Gemini Models API returned an empty model list")
+		return nil, errors.New("gemini Models API returned an empty model list")
 	}
 	// Cache persistence is an optimization; model discovery remains usable if it fails.
 	_ = writeModelCache(models)
@@ -328,7 +328,9 @@ func (c *Client) fetchAllModels(ctx context.Context, baseURL, key string) ([]Mod
 			return nil, networkError(err)
 		}
 		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			return nil, fmt.Errorf("close Models API response body: %w", err)
+		}
 		if readErr != nil {
 			return nil, fmt.Errorf("failed to read Models API response: %w", readErr)
 		}
@@ -476,7 +478,7 @@ func (c *Client) Generate(ctx context.Context, cfg Config, model, prompt string,
 		return text, nil
 	}
 
-	return "", errors.New("Gemini request failed after the maximum retry count")
+	return "", errors.New("gemini request failed after the maximum retry count")
 }
 
 func ParseResponse(body []byte, api string) (string, error) {

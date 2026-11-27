@@ -287,16 +287,16 @@ func writeFileAtomically(path string, data []byte, overwrite bool) error {
 	}
 	tmpPath := tmp.Name()
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("write temporary config for %s: %w", path, err)
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("close temporary config for %s: %w", path, err)
 	}
 	if err := assetimage.ReplaceFile(tmpPath, path, overwrite); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("replace config at %s: %w", path, err)
 	}
 	return nil

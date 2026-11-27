@@ -142,7 +142,9 @@ func NewUpdateCmd() *cobra.Command {
 				return err
 			}
 			checksums, err := updater.ParseChecksums(checksumFile)
-			checksumFile.Close()
+			if err := checksumFile.Close(); err != nil {
+				return fmt.Errorf("close checksum file: %w", err)
+			}
 			if err != nil {
 				return err
 			}
@@ -155,10 +157,12 @@ func NewUpdateCmd() *cobra.Command {
 				return err
 			}
 			if err := updater.VerifySHA256(archiveFile, expected); err != nil {
-				archiveFile.Close()
+				_ = archiveFile.Close()
 				return err
 			}
-			archiveFile.Close()
+			if err := archiveFile.Close(); err != nil {
+				return fmt.Errorf("close downloaded archive: %w", err)
+			}
 
 			binaryPath, err := updater.ExtractArchive(archivePath, working, asset.Name, goos)
 			if err != nil {

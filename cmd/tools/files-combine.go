@@ -64,10 +64,8 @@ func runFilesCombine(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
 	writer := bufio.NewWriter(file)
-	defer writer.Flush()
 
 	// Iterujemy po każdym wskazanym katalogu docelowym
 	for _, target := range targets {
@@ -108,6 +106,14 @@ func runFilesCombine(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := writer.Flush(); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("failed to flush writer: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close combined file: %w", err)
 	}
 
 	fmt.Printf("✅ Finished! Combined into: %s\n", outputFile)

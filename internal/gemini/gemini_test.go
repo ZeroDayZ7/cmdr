@@ -96,10 +96,14 @@ func TestModelPaginationAndFiltering(t *testing.T) {
 			t.Fatal("missing API key header")
 		}
 		if r.URL.Query().Get("pageToken") == "next" {
-			json.NewEncoder(w).Encode(map[string]any{"models": []any{map[string]any{"name": "models/gemini-2.5-pro", "displayName": "Gemini 2.5 Pro", "supportedGenerationMethods": []string{"generateContent"}}}})
+			if err := json.NewEncoder(w).Encode(map[string]any{"models": []any{map[string]any{"name": "models/gemini-2.5-pro", "displayName": "Gemini 2.5 Pro", "supportedGenerationMethods": []string{"generateContent"}}}}); err != nil {
+				t.Fatalf("encode model page: %v", err)
+			}
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"models": []any{map[string]any{"name": "models/gemini-embedding-001", "supportedGenerationMethods": []string{"embedContent"}}, map[string]any{"name": "models/gemini-2.5-flash", "displayName": "Gemini 2.5 Flash", "supportedGenerationMethods": []string{"generateContent"}}}, "nextPageToken": "next"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"models": []any{map[string]any{"name": "models/gemini-embedding-001", "supportedGenerationMethods": []string{"embedContent"}}, map[string]any{"name": "models/gemini-2.5-flash", "displayName": "Gemini 2.5 Flash", "supportedGenerationMethods": []string{"generateContent"}}}, "nextPageToken": "next"}); err != nil {
+			t.Fatalf("encode model page: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -134,7 +138,9 @@ func TestInteractionsRequestAndResponse(t *testing.T) {
 			t.Fatalf("unexpected body: %#v", body)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"output_text": "Hello from Gemini"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"output_text": "Hello from Gemini"}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -151,8 +157,6 @@ func TestInteractionsRequestAndResponse(t *testing.T) {
 }
 
 func TestGenerateContentRequestAndParse(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.API = GenerateContentAPI
 	payload, err := json.Marshal(map[string]any{"model": "gemini-2.5-pro", "input": "hello"})
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +229,9 @@ func TestGenerateRetries503ThenSucceeds(t *testing.T) {
 			http.Error(w, `{"error":{"message":"temporarily unavailable"}}`, http.StatusServiceUnavailable)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"output_text": "recovered"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"output_text": "recovered"}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -249,7 +255,9 @@ func TestGenerate429QuotaNoRetry(t *testing.T) {
 		attempts++
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "Quota exhausted", "details": []any{map[string]any{"reason": "QUOTA_EXHAUSTED"}}}})
+		if err := json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "Quota exhausted", "details": []any{map[string]any{"reason": "QUOTA_EXHAUSTED"}}}}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -275,10 +283,14 @@ func TestGenerate429WithRetryAfterRetries(t *testing.T) {
 		if attempts == 1 {
 			w.Header().Set("Retry-After", "1")
 			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "temporarily rate limited"}})
+			if err := json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "temporarily rate limited"}}); err != nil {
+				t.Fatalf("encode response: %v", err)
+			}
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"output_text": "ok"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"output_text": "ok"}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -386,7 +398,9 @@ func TestNetworkFailureRetryThenSuccess(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
-		json.NewEncoder(w).Encode(map[string]any{"output_text": "network recovered"})
+		if err := json.NewEncoder(w).Encode(map[string]any{"output_text": "network recovered"}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
 	}))
 	cfg := DefaultConfig()
 	cfg.BaseURL = server.URL
