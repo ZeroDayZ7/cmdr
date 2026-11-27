@@ -52,5 +52,7 @@
       "-**/docker"
     ]
   },
-  "go.vetOnSave": "off"
+  "go.vetOnSave": "off",
+  "cmake.sourceDirectory": "C:/Users/Neo/Desktop/WWW/go/cmdr/cpp",
+  "cmake.autoDetectSourceDirectory": false
 }

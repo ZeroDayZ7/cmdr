@@ -7,10 +7,107 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/zerodayz7/cmdr/internal/profiles"
 )
+
+type apiServiceConfig struct {
+	URL    string `json:"url"`
+	ApiKey string `json:"apiKey"`
+}
+
+type apiConfig map[string]apiServiceConfig
+
+func writeApiConfig(config apiConfig) (string, error) {
+	configPath, err := profiles.GetAskConfigPath()
+	if err != nil {
+		return "", err
+	}
+
+	configData, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to encode config file %s: %v", configPath, err)
+	}
+	if err := os.WriteFile(configPath, configData, 0644); err != nil {
+		return "", fmt.Errorf("failed to create config file %s: %v", configPath, err)
+	}
+	return configPath, nil
+}
+
+func readApiConfig() (apiConfig, error) {
+	configPath, err := profiles.GetAskConfigPath()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		defaultConfig := apiConfig{
+			"gemini": {
+				URL:    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+				ApiKey: "your_gemini_api_key_here",
+			},
+		}
+		if _, err := writeApiConfig(defaultConfig); err != nil {
+			return nil, err
+		}
+		fmt.Printf("Config file %s created with default values.\n", configPath)
+		return defaultConfig, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to check config file %s: %v", configPath, err)
+	}
+
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file %s: %v", configPath, err)
+	}
+
+	var config apiConfig
+	if err := json.Unmarshal(content, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config file %s: %v", configPath, err)
+	}
+
+	return config, nil
+}
+
+func fetchGeminiData(url, apiKey, query string) (string, error) {
+	requestBody := map[string]any{
+		"contents": []map[string]any{
+			{
+				"parts": []map[string]any{
+					{"text": query},
+				},
+			},
+		},
+	}
+
+	requestBodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request body: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBodyBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-goog-api-key", apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	return string(body), nil
+}
 
 func NewAskCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -90,90 +187,4 @@ You can also add files to the query using the -f flag.`,
 	cmd.Flags().StringArrayP("file", "f", []string{}, "Add files to the query")
 
 	return cmd
-}
-
-func readApiConfig() (map[string]struct {
-	URL    string `json:"url"`
-	ApiKey string `json:"apiKey"`
-}, error) {
-	exePath, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get executable path: %v", err)
-	}
-
-	dir := filepath.Dir(exePath)
-	configPath := filepath.Join(dir, ".config.json")
-
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		defaultConfig := map[string]struct {
-			URL    string `json:"url"`
-			ApiKey string `json:"apiKey"`
-		}{
-			"gemini": {
-				URL:    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-				ApiKey: "your_gemini_api_key_here",
-			},
-		}
-		configData, _ := json.MarshalIndent(defaultConfig, "", "  ")
-		if err := os.WriteFile(configPath, configData, 0644); err != nil {
-			return nil, fmt.Errorf("failed to create config file %s: %v", configPath, err)
-		}
-		fmt.Println("Config file .config.json created with default values.")
-		return defaultConfig, nil
-	}
-
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %v", configPath, err)
-	}
-
-	var config map[string]struct {
-		URL    string `json:"url"`
-		ApiKey string `json:"apiKey"`
-	}
-	err = json.Unmarshal(content, &config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config file %s: %v", configPath, err)
-	}
-
-	return config, nil
-}
-
-func fetchGeminiData(url, apiKey, query string) (string, error) {
-	requestBody := map[string]any{
-		"contents": []map[string]any{
-			{
-				"parts": []map[string]any{
-					{"text": query},
-				},
-			},
-		},
-	}
-
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBodyBytes))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-goog-api-key", apiKey)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	return string(body), nil
 }
