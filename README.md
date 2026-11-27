@@ -109,6 +109,28 @@ Initialize the default assets configuration:
 cmdr assets config init
 ```
 
+### Gemini ASK
+
+Set `GEMINI_API_KEY` or configure `apiKey` in the CMDR configuration:
+
+```powershell
+$env:GEMINI_API_KEY="YOUR_API_KEY"
+```
+
+Ask a question, discover compatible models, or change the default:
+
+```bash
+cmdr ask -q "Explain this Go code"
+cmdr ask "Explain this Go code"
+cmdr ask models
+cmdr ask models --refresh
+cmdr ask --model gemini-3.8-flash "Review this code"
+cmdr ask config
+cmdr ask config --model gemini-3.8-flash
+```
+
+Configuration is stored at `%USERPROFILE%\.cmdr\.config.json` or `$HOME/.cmdr/.config.json`. `cmdr ask config` only reports key status, never the key itself.
+
 ### Cryptography
 
 Generate a secure 20-character password:
