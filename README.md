@@ -131,6 +131,15 @@ cmdr ask config --model gemini-3.8-flash
 
 Configuration is stored at `%USERPROFILE%\.cmdr\.config.json` or `$HOME/.cmdr/.config.json`. `cmdr ask config` only reports key status, never the key itself.
 
+CMDR retries temporary network failures and HTTP 500, 502, 503, 504 responses. Eligible HTTP 429 responses are also retried while respecting `Retry-After`. Authentication, model-not-found, permanent quota, and malformed successful responses are not retried. The default is two retries:
+
+```bash
+cmdr ask --retries 1 "Explain this code"
+cmdr ask --retries 0 "Do not retry this request"
+```
+
+The maximum supported retry count is five. Retries may result in additional Gemini API usage.
+
 ### Cryptography
 
 Generate a secure 20-character password:

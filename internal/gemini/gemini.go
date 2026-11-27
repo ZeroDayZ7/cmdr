@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,10 @@ const (
 	DefaultModel       = "gemini-4-hydrogen"
 	InteractionsAPI    = "interactions"
 	GenerateContentAPI = "generate-content"
+
+	DefaultRetries = 2
+	MaxRetries     = 5
+	maxRetryDelay  = 8 * time.Second
 )
 
 type Config struct {
@@ -65,10 +70,14 @@ type modelCache struct {
 
 type Client struct {
 	HTTPClient *http.Client
+	Sleep      func(context.Context, time.Duration) error
 }
 
 func NewClient() *Client {
-	return &Client{HTTPClient: &http.Client{Timeout: 30 * time.Second}}
+	return &Client{
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
+		Sleep:      sleepContext,
+	}
 }
 
 func DefaultConfig() Config {
@@ -381,11 +390,22 @@ func containsFold(values []string, wanted string) bool {
 	return false
 }
 
-func (c *Client) Generate(ctx context.Context, cfg Config, model, prompt string) (string, error) {
+func (c *Client) Generate(ctx context.Context, cfg Config, model, prompt string, retryCounts ...int) (string, error) {
 	key, err := c.EffectiveAPIKey(cfg)
 	if err != nil {
 		return "", err
 	}
+	retries := DefaultRetries
+	if len(retryCounts) > 0 {
+		retries = retryCounts[0]
+	}
+	if retries < 0 {
+		retries = 0
+	}
+	if retries > MaxRetries {
+		retries = MaxRetries
+	}
+
 	if strings.TrimSpace(model) == "" {
 		model = cfg.Model
 	}
@@ -405,31 +425,58 @@ func (c *Client) Generate(ctx context.Context, cfg Config, model, prompt string)
 		return "", fmt.Errorf("failed to encode Gemini request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-	if err != nil {
-		return "", fmt.Errorf("failed to create Gemini request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Goog-Api-Key", key)
+	for attempt := 0; attempt <= retries; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return "", contextError(err)
+		}
 
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return "", networkError(err)
-	}
-	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	resp.Body.Close()
-	if readErr != nil {
-		return "", fmt.Errorf("failed to read Gemini response: %w", readErr)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", apiStatusError(resp.StatusCode, body)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+		if err != nil {
+			return "", fmt.Errorf("failed to create Gemini request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Goog-Api-Key", key)
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			if attempt < retries && isTemporaryNetworkError(err) {
+				if err := c.waitForRetry(ctx, attempt, ""); err != nil {
+					return "", err
+				}
+				continue
+			}
+			return "", networkError(err)
+		}
+
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+		resp.Body.Close()
+		if readErr != nil {
+			if attempt < retries && ctx.Err() == nil {
+				if err := c.waitForRetry(ctx, attempt, ""); err != nil {
+					return "", err
+				}
+				continue
+			}
+			return "", fmt.Errorf("failed to read Gemini response: %w", readErr)
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			if attempt < retries && isRetryableStatus(resp.StatusCode, resp.Header.Get("Retry-After"), body) {
+				if err := c.waitForRetry(ctx, attempt, resp.Header.Get("Retry-After")); err != nil {
+					return "", err
+				}
+				continue
+			}
+			return "", apiStatusError(resp.StatusCode, body)
+		}
+
+		text, err := ParseResponse(body, cfg.API)
+		if err != nil {
+			return "", err
+		}
+		return text, nil
 	}
 
-	text, err := ParseResponse(body, cfg.API)
-	if err != nil {
-		return "", err
-	}
-	return text, nil
+	return "", errors.New("Gemini request failed after the maximum retry count")
 }
 
 func ParseResponse(body []byte, api string) (string, error) {
@@ -525,4 +572,103 @@ func apiStatusError(status int, body []byte) error {
 		return fmt.Errorf("Gemini API request failed (%d): %s", status, message)
 	}
 	return fmt.Errorf("Gemini API request failed (%d)", status)
+}
+
+func (c *Client) waitForRetry(ctx context.Context, attempt int, retryAfter string) error {
+	delay := retryDelay(attempt, retryAfter)
+	sleep := c.Sleep
+	if sleep == nil {
+		sleep = sleepContext
+	}
+	if err := sleep(ctx, delay); err != nil {
+		return contextError(err)
+	}
+	return nil
+}
+
+func retryDelay(attempt int, retryAfter string) time.Duration {
+	if retryAfter != "" {
+		if seconds, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && seconds >= 0 {
+			delay := time.Duration(seconds) * time.Second
+			if delay > maxRetryDelay {
+				return maxRetryDelay
+			}
+			return delay
+		}
+		if date, err := http.ParseTime(retryAfter); err == nil {
+			delay := time.Until(date)
+			if delay < 0 {
+				delay = 0
+			}
+			if delay > maxRetryDelay {
+				return maxRetryDelay
+			}
+			return delay
+		}
+	}
+
+	delay := time.Duration(1<<min(attempt, 4)) * 250 * time.Millisecond
+	if delay > maxRetryDelay {
+		return maxRetryDelay
+	}
+	return delay
+}
+
+func sleepContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func contextError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return errors.New("Gemini request context deadline exceeded")
+	}
+	if errors.Is(err, context.Canceled) {
+		return errors.New("Gemini request canceled")
+	}
+	return err
+}
+
+func isTemporaryNetworkError(err error) bool {
+	return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
+}
+
+func isRetryableStatus(status int, retryAfter string, body []byte) bool {
+	if status >= 500 && status <= 599 {
+		return true
+	}
+	if status != http.StatusTooManyRequests {
+		return false
+	}
+
+	var googleError struct {
+		Error struct {
+			Details []struct {
+				Reason string `json:"reason"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &googleError) != nil {
+		return retryAfter != ""
+	}
+	for _, detail := range googleError.Error.Details {
+		reason := strings.ToUpper(detail.Reason)
+		if strings.Contains(reason, "QUOTA_EXHAUSTED") {
+			return false
+		}
+		if strings.Contains(reason, "RESOURCE_EXHAUSTED") {
+			return retryAfter != ""
+		}
+	}
+	message := strings.ToLower(string(body))
+	if strings.Contains(message, "quota exceeded") || strings.Contains(message, "quota_exhausted") || strings.Contains(message, "daily limit") {
+		return false
+	}
+	return true
 }

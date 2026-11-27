@@ -22,6 +22,11 @@ model override, "ask models" to discover available compatible models, or
 "ask config --model MODEL" to change the saved default. API keys are never shown.`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			retries, _ := cmd.Flags().GetInt("retries")
+			if retries < 0 || retries > gemini.MaxRetries {
+				return fmt.Errorf("--retries must be between 0 and %d", gemini.MaxRetries)
+			}
+
 			query, _ := cmd.Flags().GetString("query")
 			if strings.TrimSpace(query) == "" {
 				query = strings.Join(args, " ")
@@ -53,7 +58,7 @@ model override, "ask models" to discover available compatible models, or
 				query += "\n" + string(fileContent)
 			}
 
-			text, err := gemini.NewClient().Generate(context.Background(), cfg, model, query)
+			text, err := gemini.NewClient().Generate(context.Background(), cfg, model, query, retries)
 			if err != nil {
 				return err
 			}
@@ -65,6 +70,7 @@ model override, "ask models" to discover available compatible models, or
 	cmd.Flags().StringP("model", "m", "", "Use a Gemini model for this request only")
 	cmd.Flags().StringP("query", "q", "", "The query to send to Gemini")
 	cmd.Flags().StringArrayP("file", "f", nil, "Add a file to the query")
+	cmd.Flags().Int("retries", gemini.DefaultRetries, fmt.Sprintf("Maximum retries for temporary Gemini failures (0-%d)", gemini.MaxRetries))
 
 	modelsCmd := &cobra.Command{
 		Use:   "models",

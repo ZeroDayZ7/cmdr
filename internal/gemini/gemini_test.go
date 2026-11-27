@@ -3,11 +3,15 @@ package gemini
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/zerodayz7/cmdr/internal/profiles"
 )
@@ -166,6 +170,27 @@ func TestGenerateContentRequestAndParse(t *testing.T) {
 	}
 }
 
+func TestParseResponseRejectsInvalidAndEmptyResponses(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		api  string
+	}{
+		{"invalid JSON", `{`, InteractionsAPI},
+		{"missing interactions text", `{"outputs":[{"type":"model"}]}`, InteractionsAPI},
+		{"empty interactions text", `{"output_text":""}`, InteractionsAPI},
+		{"missing generate candidates", `{"candidates":[]}`, GenerateContentAPI},
+		{"empty generate text", `{"candidates":[{"content":{"parts":[{"text":""}]}}]}`, GenerateContentAPI},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if text, err := ParseResponse([]byte(tc.body), tc.api); err == nil || strings.TrimSpace(text) != "" {
+				t.Fatalf("text=%q err=%v", text, err)
+			}
+		})
+	}
+}
+
 func TestAPIStatusErrors(t *testing.T) {
 	unauthorized := apiStatusError(http.StatusUnauthorized, []byte(`{"error":{"message":"bad key"}}`))
 	if unauthorized.Error() != "Gemini authentication failed (401): API key is missing or invalid" {
@@ -189,4 +214,205 @@ func TestModelCacheIndependentOfWorkingDirectory(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, ".cmdr", "models-cache.json")); !os.IsNotExist(err) {
 		t.Fatalf("cache should not exist yet: %v", err)
 	}
+}
+
+func TestGenerateRetries503ThenSucceeds(t *testing.T) {
+	setGeminiTestHome(t)
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			http.Error(w, `{"error":{"message":"temporarily unavailable"}}`, http.StatusServiceUnavailable)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"output_text": "recovered"})
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	client.Sleep = func(context.Context, time.Duration) error { return nil }
+	cfg := DefaultConfig()
+	cfg.BaseURL = server.URL
+	cfg.APIKey = "test-key"
+	text, err := client.Generate(context.Background(), cfg, "gemini-4-hydrogen", "hello", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "recovered" || attempts != 2 {
+		t.Fatalf("text=%q attempts=%d", text, attempts)
+	}
+}
+
+func TestGenerate429QuotaNoRetry(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "Quota exhausted", "details": []any{map[string]any{"reason": "QUOTA_EXHAUSTED"}}}})
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	client.Sleep = func(context.Context, time.Duration) error { return nil }
+	cfg := DefaultConfig()
+	cfg.BaseURL = server.URL
+	cfg.APIKey = "test-key"
+	_, err := client.Generate(context.Background(), cfg, "gemini-4-hydrogen", "hello", 3)
+	if err == nil {
+		t.Fatal("expected 429 error")
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts=%d, want 1", attempts)
+	}
+}
+
+func TestGenerate429WithRetryAfterRetries(t *testing.T) {
+	attempts := 0
+	var delays []time.Duration
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"message": "temporarily rate limited"}})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"output_text": "ok"})
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	client.Sleep = func(_ context.Context, delay time.Duration) error {
+		delays = append(delays, delay)
+		return nil
+	}
+	cfg := DefaultConfig()
+	cfg.BaseURL = server.URL
+	cfg.APIKey = "test-key"
+	_, err := client.Generate(context.Background(), cfg, "gemini-4-hydrogen", "hello", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 2 || len(delays) != 1 || delays[0] != time.Second {
+		t.Fatalf("attempts=%d delays=%v", attempts, delays)
+	}
+}
+
+func TestGenerate401NoRetry(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		http.Error(w, `{"error":{"message":"invalid key"}}`, http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	cfg := DefaultConfig()
+	cfg.BaseURL = server.URL
+	cfg.APIKey = "bad-key"
+	_, err := client.Generate(context.Background(), cfg, "gemini-4-hydrogen", "hello", 3)
+	if err == nil || !strings.Contains(err.Error(), "401") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts=%d, want 1", attempts)
+	}
+}
+
+func TestGenerateMaximumRetryCount(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		http.Error(w, `{"error":{"message":"temporarily unavailable"}}`, http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	client := NewClient()
+	client.Sleep = func(context.Context, time.Duration) error { return nil }
+	cfg := DefaultConfig()
+	cfg.BaseURL = server.URL
+	cfg.APIKey = "test-key"
+	_, err := client.Generate(context.Background(), cfg, "gemini-4-hydrogen", "hello", 3)
+	if err == nil {
+		t.Fatal("expected final error")
+	}
+	if attempts != 4 {
+		t.Fatalf("attempts=%d, want 4", attempts)
+	}
+}
+
+func TestGenerateContextCanceledDuringBackoff(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":{"message":"temporarily unavailable"}}`, http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	client := NewClient()
+	client.Sleep = func(ctx context.Context, delay time.Duration) error {
+		cancel()
+		return ctx.Err()
+	}
+	cfg := DefaultConfig()
+	cfg.BaseURL = server.URL
+	cfg.APIKey = "test-key"
+	_, err := client.Generate(ctx, cfg, "gemini-4-hydrogen", "hello", 2)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "canceled") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRetryClassifier(t *testing.T) {
+	for _, status := range []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
+		if !isRetryableStatus(status, "", nil) {
+			t.Fatalf("status %d should be retryable", status)
+		}
+	}
+	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
+		if isRetryableStatus(status, "", nil) {
+			t.Fatalf("status %d should not be retryable", status)
+		}
+	}
+	if isRetryableStatus(http.StatusTooManyRequests, "", []byte(`{"error":{"details":[{"reason":"QUOTA_EXHAUSTED"}]}}`)) {
+		t.Fatal("quota exhaustion should not be retried")
+	}
+	if !isRetryableStatus(http.StatusTooManyRequests, "1", nil) {
+		t.Fatal("429 with Retry-After should be retried")
+	}
+}
+
+func TestNetworkFailureRetryThenSuccess(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		json.NewEncoder(w).Encode(map[string]any{"output_text": "network recovered"})
+	}))
+	cfg := DefaultConfig()
+	cfg.BaseURL = server.URL
+	cfg.APIKey = "test-key"
+	client := NewClient()
+	client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		attempts++
+		if attempts == 1 {
+			return nil, errors.New("temporary network failure")
+		}
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"output_text":"network recovered"}`)), Request: req}, nil
+	})}
+	client.Sleep = func(context.Context, time.Duration) error { return nil }
+
+	text, err := client.Generate(context.Background(), cfg, "gemini-4-hydrogen", "hello", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "network recovered" {
+		t.Fatalf("text=%q", text)
+	}
+	server.Close()
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
