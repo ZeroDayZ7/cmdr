@@ -23,7 +23,9 @@ func NewUpdateCmd() *cobra.Command {
 		Short: "Check for or install cmdr updates",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			updater.PrintStage(cmd.OutOrStdout(), "Checking for a newer version")
+			if err := updater.PrintStage(cmd.OutOrStdout(), "Checking for a newer version"); err != nil {
+				return err
+			}
 
 			goos, goarch := updater.CurrentPlatform()
 			if goos != "windows" && goos != "linux" {
@@ -120,7 +122,9 @@ func NewUpdateCmd() *cobra.Command {
 
 			archivePath := filepath.Join(working, asset.Name)
 			checksumPath := filepath.Join(working, "checksums.txt")
-			updater.PrintStage(cmd.OutOrStdout(), "Downloading update")
+			if err := updater.PrintStage(cmd.OutOrStdout(), "Downloading update"); err != nil {
+				return err
+			}
 			progress := updater.NewProgressRenderer(cmd.OutOrStdout())
 			started := time.Now()
 			var downloaded int64
@@ -136,7 +140,9 @@ func NewUpdateCmd() *cobra.Command {
 				return err
 			}
 
-			updater.PrintStage(cmd.OutOrStdout(), "Verifying SHA-256 checksum")
+			if err := updater.PrintStage(cmd.OutOrStdout(), "Verifying SHA-256 checksum"); err != nil {
+				return err
+			}
 			checksumFile, err := os.Open(checksumPath)
 			if err != nil {
 				return err
@@ -177,18 +183,24 @@ func NewUpdateCmd() *cobra.Command {
 				return err
 			}
 
-			updater.PrintStage(cmd.OutOrStdout(), "Installing update")
-			if err := updater.ApplyPlatformUpdate(currentPath, stagedPath); err != nil {
-				_ = os.Remove(stagedPath)
+			if err := updater.PrintStage(cmd.OutOrStdout(), "Installing update"); err != nil {
+				return err
+			}
+			if err := updater.PrintCompleted(cmd.OutOrStdout(), latestVersion); err != nil {
 				return err
 			}
 			if goos == "windows" {
+				if err := updater.ApplyPlatformUpdate(currentPath, stagedPath); err != nil {
+					return err
+				}
 				cmd.Println("Update helper is replacing cmdr.exe after this process exits.")
 				cmd.Printf("Windows update status file: %s.cmdr-update.result\n", currentPath)
 				cmd.Println("Do not report success until the status file contains 'success'.")
 				return nil
 			}
-			updater.PrintCompleted(cmd.OutOrStdout(), latestVersion)
+			if err := updater.ApplyPlatformUpdate(currentPath, stagedPath); err != nil {
+				return err
+			}
 			return nil
 		},
 	}

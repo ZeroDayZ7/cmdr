@@ -40,7 +40,9 @@ model override, "ask models" to discover available compatible models, or
 				return err
 			}
 			for _, warning := range warnings {
-				fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning); err != nil {
+					return err
+				}
 			}
 
 			modelOverride, _ := cmd.Flags().GetString("model")
@@ -62,7 +64,9 @@ model override, "ask models" to discover available compatible models, or
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), text)
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), text); err != nil {
+				return fmt.Errorf("write Gemini response: %w", err)
+			}
 			return nil
 		},
 	}
@@ -83,13 +87,17 @@ model override, "ask models" to discover available compatible models, or
 				return err
 			}
 			for _, warning := range warnings {
-				fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning); err != nil {
+					return err
+				}
 			}
 			models, err := gemini.NewClient().ListModels(context.Background(), cfg, refresh)
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%-42s %-28s %-12s %s\n", "MODEL ID", "DISPLAY NAME", "TOKENS", "CAPABILITIES")
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%-42s %-28s %-12s %s\n", "MODEL ID", "DISPLAY NAME", "TOKENS", "CAPABILITIES"); err != nil {
+				return err
+			}
 			for _, model := range models {
 				name := model.DisplayName
 				if strings.TrimSpace(name) == "" {
@@ -103,7 +111,9 @@ model override, "ask models" to discover available compatible models, or
 				if capabilities == "" {
 					capabilities = "text generation"
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%-42s %-28s %-12s %s\n", model.ID(), name, tokens, capabilities)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%-42s %-28s %-12s %s\n", model.ID(), name, tokens, capabilities); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -120,7 +130,9 @@ model override, "ask models" to discover available compatible models, or
 				return err
 			}
 			for _, warning := range warnings {
-				fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning); err != nil {
+					return err
+				}
 			}
 
 			model, _ := cmd.Flags().GetString("model")
@@ -129,7 +141,9 @@ model override, "ask models" to discover available compatible models, or
 				if err := gemini.SaveConfig(cfg); err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Default Gemini model changed to: %s\n", cfg.Model)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Default Gemini model changed to: %s\n", cfg.Model); err != nil {
+					return err
+				}
 				return nil
 			}
 
@@ -139,7 +153,9 @@ model override, "ask models" to discover available compatible models, or
 			} else if strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" {
 				keyStatus = "configured through GEMINI_API_KEY"
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Provider: Gemini\nBase URL: %s\nAPI: %s\nModel: %s\nAPI key: %s\n", cfg.BaseURL, cfg.API, cfg.Model, keyStatus)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Provider: Gemini\nBase URL: %s\nAPI: %s\nModel: %s\nAPI key: %s\n", cfg.BaseURL, cfg.API, cfg.Model, keyStatus); err != nil {
+				return err
+			}
 			return nil
 		},
 	}

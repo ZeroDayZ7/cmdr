@@ -84,7 +84,9 @@ func TestWriteTextAndJSONSummary(t *testing.T) {
 		Summary: Summary{Checks: 2, Passed: 1, Warnings: 1, Failed: 0},
 	}
 	var text bytes.Buffer
-	WriteText(&text, report, false)
+	if err := WriteText(&text, report, false); err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(text.String(), "Warnings: 1") {
 		t.Fatalf("text summary missing: %s", text.String())
 	}

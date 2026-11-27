@@ -197,7 +197,7 @@ func TestParseResponseRejectsInvalidAndEmptyResponses(t *testing.T) {
 
 func TestAPIStatusErrors(t *testing.T) {
 	unauthorized := apiStatusError(http.StatusUnauthorized, []byte(`{"error":{"message":"bad key"}}`))
-	if unauthorized.Error() != "Gemini authentication failed (401): API key is missing or invalid" {
+	if unauthorized.Error() != "gemini authentication failed (401): API key is missing or invalid" {
 		t.Fatalf("unexpected 401 error: %v", unauthorized)
 	}
 	quota := apiStatusError(http.StatusTooManyRequests, nil)

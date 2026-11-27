@@ -138,23 +138,41 @@ func (p *ProgressRenderer) Render(progress DownloadProgress) {
 		percentage := ProgressPercentage(progress.Downloaded, progress.Total)
 		bar := progressBar(percentage)
 		speed := DownloadSpeed(progress.Downloaded, progress.Elapsed)
-		fmt.Fprint(p.w, "\rDownloading: ")
-		if p.color {
-			fmt.Fprint(p.w, "\033[38;2;163;230;53m")
+		if _, err := fmt.Fprint(p.w, "\rDownloading: "); err != nil {
+			return
 		}
-		fmt.Fprint(p.w, bar)
 		if p.color {
-			fmt.Fprint(p.w, "\033[0m")
+			if _, err := fmt.Fprint(p.w, "\033[38;2;163;230;53m"); err != nil {
+				return
+			}
+		}
+		if _, err := fmt.Fprint(p.w, bar); err != nil {
+			return
+		}
+		if p.color {
+			if _, err := fmt.Fprint(p.w, "\033[0m"); err != nil {
+				return
+			}
 		}
 		if percentage >= 0 {
-			fmt.Fprintf(p.w, " %3d%%", percentage)
+			if _, err := fmt.Fprintf(p.w, " %3d%%", percentage); err != nil {
+				return
+			}
 		}
-		fmt.Fprintf(p.w, "  %s / %s", FormatBytes(progress.Downloaded), formatProgressTotal(progress.Total))
-		fmt.Fprintf(p.w, "  %.1f MB/s", speed/(1024*1024))
+		if _, err := fmt.Fprintf(p.w, "  %s / %s", FormatBytes(progress.Downloaded), formatProgressTotal(progress.Total)); err != nil {
+			return
+		}
+		if _, err := fmt.Fprintf(p.w, "  %.1f MB/s", speed/(1024*1024)); err != nil {
+			return
+		}
 		if eta := DownloadETA(progress.Downloaded, progress.Total, progress.Elapsed); eta >= 0 {
-			fmt.Fprintf(p.w, "  ETA: %s", formatDuration(eta))
+			if _, err := fmt.Fprintf(p.w, "  ETA: %s", formatDuration(eta)); err != nil {
+				return
+			}
 		}
-		fmt.Fprint(p.w, "\033[K")
+		if _, err := fmt.Fprint(p.w, "\033[K"); err != nil {
+			return
+		}
 		flushProgressWriter(p.w)
 		return
 	}
@@ -163,9 +181,13 @@ func (p *ProgressRenderer) Render(progress DownloadProgress) {
 		p.lastInteractive = now
 		percentage := ProgressPercentage(progress.Downloaded, progress.Total)
 		if percentage >= 0 {
-			fmt.Fprintf(p.w, "Downloading: %s / %s (%d%%)\n", FormatBytes(progress.Downloaded), formatProgressTotal(progress.Total), percentage)
+			if _, err := fmt.Fprintf(p.w, "Downloading: %s / %s (%d%%)\n", FormatBytes(progress.Downloaded), formatProgressTotal(progress.Total), percentage); err != nil {
+				return
+			}
 		} else {
-			fmt.Fprintf(p.w, "Downloading: %s\n", FormatBytes(progress.Downloaded))
+			if _, err := fmt.Fprintf(p.w, "Downloading: %s\n", FormatBytes(progress.Downloaded)); err != nil {
+				return
+			}
 		}
 		flushProgressWriter(p.w)
 	}
@@ -176,10 +198,14 @@ func (p *ProgressRenderer) Finish(downloaded int64, elapsed time.Duration) {
 		return
 	}
 	if p.interactive {
-		fmt.Fprint(p.w, "\r\033[K")
+		if _, err := fmt.Fprint(p.w, "\r\033[K"); err != nil {
+			return
+		}
 	}
 	speed := DownloadSpeed(downloaded, elapsed)
-	fmt.Fprintf(p.w, "Downloaded %s in %s (%.1f MB/s)\n", FormatBytes(downloaded), formatDuration(elapsed), speed/(1024*1024))
+	if _, err := fmt.Fprintf(p.w, "Downloaded %s in %s (%.1f MB/s)\n", FormatBytes(downloaded), formatDuration(elapsed), speed/(1024*1024)); err != nil {
+		return
+	}
 	flushProgressWriter(p.w)
 }
 
@@ -188,9 +214,13 @@ func (p *ProgressRenderer) Abort(reason string) {
 		return
 	}
 	if p.interactive {
-		fmt.Fprint(p.w, "\r\033[K")
+		if _, err := fmt.Fprint(p.w, "\r\033[K"); err != nil {
+			return
+		}
 	}
-	fmt.Fprintf(p.w, "Download stopped: %s\n", reason)
+	if _, err := fmt.Fprintf(p.w, "Download stopped: %s\n", reason); err != nil {
+		return
+	}
 	flushProgressWriter(p.w)
 }
 
@@ -231,22 +261,24 @@ func formatDuration(duration time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
 }
 
-func PrintStage(w io.Writer, name string) {
+func PrintStage(w io.Writer, name string) error {
 	green := ""
 	reset := ""
 	if terminalColor(w) {
 		green, reset = "\033[38;2;163;230;53m", "\033[0m"
 	}
-	fmt.Fprintf(w, "%s[%s]%s %s\n", green, "●", reset, name)
+	_, err := fmt.Fprintf(w, "%s[%s]%s %s\n", green, "●", reset, name)
+	return err
 }
 
-func PrintCompleted(w io.Writer, version string) {
+func PrintCompleted(w io.Writer, version string) error {
 	green := ""
 	reset := ""
 	if terminalColor(w) {
 		green, reset = "\033[38;2;163;230;53m", "\033[0m"
 	}
-	fmt.Fprintf(w, "%s[✓]%s Completed: cmdr updated to v%s.\n", green, reset, version)
+	_, err := fmt.Fprintf(w, "%s[✓]%s Completed: cmdr updated to v%s.\n", green, reset, version)
+	return err
 }
 
 func flushProgressWriter(w io.Writer) {

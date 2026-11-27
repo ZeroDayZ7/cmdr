@@ -10,7 +10,7 @@ import (
 )
 
 // EncryptFolderAES tworzy zip folderu i szyfruje go AES
-func EncryptFolderAES(folderPath string, key []byte, outDir string) (string, string, error) {
+func EncryptFolderAES(folderPath string, key []byte, outDir string) (encPathResult, keyPathResult string, retErr error) {
 	// Nazwa pliku wyjściowego .zip.enc
 	folderName := filepath.Base(folderPath)
 	encPath := filepath.Join(outDir, folderName+".zip.enc")
@@ -52,7 +52,11 @@ func EncryptFolderAES(folderPath string, key []byte, outDir string) (string, str
 		if err != nil {
 			return err
 		}
-		defer inFile.Close()
+		defer func() {
+			if err := inFile.Close(); err != nil && retErr == nil {
+				retErr = fmt.Errorf("close input file: %w", err)
+			}
+		}()
 
 		_, err = io.Copy(fw, inFile)
 		return err
@@ -70,7 +74,11 @@ func EncryptFolderAES(folderPath string, key []byte, outDir string) (string, str
 	if err := os.WriteFile(tmpZip, buf.Bytes(), 0600); err != nil {
 		return "", "", fmt.Errorf("failed to write temp zip: %w", err)
 	}
-	defer os.Remove(tmpZip)
+	defer func() {
+		if err := os.Remove(tmpZip); err != nil && !os.IsNotExist(err) && retErr == nil {
+			retErr = fmt.Errorf("remove temporary zip: %w", err)
+		}
+	}()
 
 	// Szyfrujemy zip
 	if _, _, err := EncryptFileAES(tmpZip, key, outDir); err != nil {

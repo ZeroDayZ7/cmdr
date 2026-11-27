@@ -12,7 +12,9 @@ import (
 func TestWriteWithoutColor(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	var out bytes.Buffer
-	Write(&out)
+	if err := Write(&out); err != nil {
+		t.Fatal(err)
+	}
 	text := out.String()
 	if strings.Contains(text, "\033[") {
 		t.Fatal("banner contains ANSI escapes when NO_COLOR is set")
@@ -37,7 +39,9 @@ func TestSupportsColorRejectsRedirect(t *testing.T) {
 func TestWriteIncludesExistingVersion(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	var out bytes.Buffer
-	Write(&out)
+	if err := Write(&out); err != nil {
+		t.Fatal(err)
+	}
 	want := "v" + config.Version
 	if !strings.Contains(out.String(), want) {
 		t.Fatalf("banner does not contain configured version %s: %s", want, out.String())

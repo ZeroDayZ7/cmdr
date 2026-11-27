@@ -451,7 +451,9 @@ func (c *Client) Generate(ctx context.Context, cfg Config, model, prompt string,
 		}
 
 		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-		resp.Body.Close()
+		if closeErr := resp.Body.Close(); closeErr != nil && readErr == nil {
+			readErr = closeErr
+		}
 		if readErr != nil {
 			if attempt < retries && ctx.Err() == nil {
 				if err := c.waitForRetry(ctx, attempt, ""); err != nil {
@@ -502,7 +504,7 @@ func ParseResponse(body []byte, api string) (string, error) {
 			}
 		}
 		if strings.TrimSpace(text.String()) == "" {
-			return "", errors.New("Gemini generateContent returned no text")
+			return "", errors.New("gemini generateContent returned no text")
 		}
 		return text.String(), nil
 	}
@@ -527,14 +529,14 @@ func ParseResponse(body []byte, api string) (string, error) {
 		}
 	}
 	if strings.TrimSpace(text.String()) == "" {
-		return "", errors.New("Gemini Interactions API returned no text")
+		return "", errors.New("gemini Interactions API returned no text")
 	}
 	return text.String(), nil
 }
 
 func networkError(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return errors.New("Gemini request timed out; check the network and try again")
+		return errors.New("gemini request timed out; check the network and try again")
 	}
 	return fmt.Errorf("cannot reach Gemini API: %w", err)
 }
@@ -559,21 +561,21 @@ func apiStatusError(status int, body []byte) error {
 
 	switch status {
 	case http.StatusUnauthorized:
-		return errors.New("Gemini authentication failed (401): API key is missing or invalid")
+		return errors.New("gemini authentication failed (401): API key is missing or invalid")
 	case http.StatusForbidden:
 		if message != "" {
-			return fmt.Errorf("Gemini authentication/authorization failed (403): %s", message)
+			return fmt.Errorf("gemini authentication/authorization failed (403): %s", message)
 		}
-		return errors.New("Gemini authentication/authorization failed (403): API key is invalid or lacks access")
+		return errors.New("gemini authentication/authorization failed (403): API key is invalid or lacks access")
 	case http.StatusNotFound:
-		return errors.New("Gemini model or API endpoint was not found (404); verify the model and API configuration")
+		return errors.New("gemini model or API endpoint was not found (404); verify the model and API configuration")
 	case http.StatusTooManyRequests:
-		return errors.New("Gemini rate limit/quota exhausted (429); wait and retry or inspect your Google AI quota")
+		return errors.New("gemini rate limit/quota exhausted (429); wait and retry or inspect your Google AI quota")
 	}
 	if message != "" {
-		return fmt.Errorf("Gemini API request failed (%d): %s", status, message)
+		return fmt.Errorf("gemini API request failed (%d): %s", status, message)
 	}
-	return fmt.Errorf("Gemini API request failed (%d)", status)
+	return fmt.Errorf("gemini API request failed (%d)", status)
 }
 
 func (c *Client) waitForRetry(ctx context.Context, attempt int, retryAfter string) error {
@@ -629,10 +631,10 @@ func sleepContext(ctx context.Context, delay time.Duration) error {
 
 func contextError(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return errors.New("Gemini request context deadline exceeded")
+		return errors.New("gemini request context deadline exceeded")
 	}
 	if errors.Is(err, context.Canceled) {
-		return errors.New("Gemini request canceled")
+		return errors.New("gemini request canceled")
 	}
 	return err
 }
