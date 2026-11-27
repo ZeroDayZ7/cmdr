@@ -51,7 +51,7 @@ func GenerateFaviconSetWithOptions(inputPath string, outputDir string, sizes []i
 	if err != nil {
 		return nil, fmt.Errorf("create staging directory for favicons: %w", err)
 	}
-	defer os.RemoveAll(stagingDir)
+	defer func() { _ = os.RemoveAll(stagingDir) }()
 
 	planned := make([]struct {
 		size int

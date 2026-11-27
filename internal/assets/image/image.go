@@ -41,9 +41,9 @@ func DecodeImage(path string) (image.Image, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("open source image %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	cfg, format, err := image.DecodeConfig(f)
+	cfg, _, err := image.DecodeConfig(f)
 	if err != nil {
 		return nil, "", fmt.Errorf("invalid image file %s: %w", path, err)
 	}

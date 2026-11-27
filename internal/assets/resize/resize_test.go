@@ -16,7 +16,7 @@ func writeImageFile(t *testing.T, path string, img image.Image, format string) {
 	if err != nil {
 		t.Fatalf("create image: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	switch format {
 	case "png":
@@ -38,7 +38,7 @@ func readImageDimensions(t *testing.T, path string) (int, int) {
 	if err != nil {
 		t.Fatalf("open output image: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	img, _, err := image.Decode(f)
 	if err != nil {
 		t.Fatalf("decode output image: %v", err)
@@ -159,7 +159,7 @@ func TestResizeSupportsWebPFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open generated WebP: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, format, err := image.Decode(f)
 	if err != nil {
 		t.Fatalf("decode generated WebP: %v", err)

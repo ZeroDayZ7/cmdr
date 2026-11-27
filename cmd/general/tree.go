@@ -66,7 +66,10 @@ func NewTreeCmd() *cobra.Command {
 				}
 				log.Success("Tree saved to %s", output)
 			} else if !copyToClipboard {
-				os.Stdout.WriteString(result + "\n")
+				if _, err := os.Stdout.WriteString(result + "\n"); err != nil {
+					log.Error("Failed to write tree output: %v", err)
+					return err
+				}
 			}
 
 			if copyToClipboard {

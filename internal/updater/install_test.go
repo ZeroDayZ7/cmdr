@@ -26,7 +26,7 @@ func TestPrepareStagedBinary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(staged)
+	defer func() { _ = os.Remove(staged) }()
 	data, err := os.ReadFile(staged)
 	if err != nil {
 		t.Fatal(err)

@@ -1,179 +1,166 @@
 package general
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/zerodayz7/cmdr/internal/gemini"
 )
 
 func NewAskCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "ask",
+		Use:     "ask [prompt]",
 		Aliases: []string{"query", "ask-api"},
-		Short:   "Ask questions to an API and get the answer",
-		Long: `This command sends a query to an API (like Gemini) and gets a response. 
-You can also add files to the query using the -f flag.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Short:   "Ask Gemini a question",
+		Long: `Ask Gemini a question using the configured API interface.
+
+CMDR uses the Gemini Interactions API by default. Use --model for a one-time
+model override, "ask models" to discover available compatible models, or
+"ask config --model MODEL" to change the saved default. API keys are never shown.`,
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			retries, _ := cmd.Flags().GetInt("retries")
+			if retries < 0 || retries > gemini.MaxRetries {
+				return fmt.Errorf("--retries must be between 0 and %d", gemini.MaxRetries)
+			}
 
 			query, _ := cmd.Flags().GetString("query")
-			if query == "" {
-				fmt.Println("Please provide a query using -q flag.")
-				return
+			if strings.TrimSpace(query) == "" {
+				query = strings.Join(args, " ")
+			}
+			if strings.TrimSpace(query) == "" {
+				return fmt.Errorf("provide a query with --query/-q or as positional text")
 			}
 
-			apiConfig, err := readApiConfig()
+			cfg, warnings, err := gemini.LoadConfig()
 			if err != nil {
-				fmt.Println("Error reading API config:", err)
-				return
+				return err
+			}
+			for _, warning := range warnings {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning); err != nil {
+					return err
+				}
 			}
 
-			service, _ := cmd.Flags().GetString("model")
-			if service == "" {
-				service = "gemini"
-			}
-
-			apiConfigForService, exists := apiConfig[service]
-			if !exists {
-				fmt.Println("Error: Service configuration for", service, "not found.")
-				return
+			modelOverride, _ := cmd.Flags().GetString("model")
+			model := cfg.Model
+			if strings.TrimSpace(modelOverride) != "" {
+				model = strings.TrimSpace(modelOverride)
 			}
 
 			files, _ := cmd.Flags().GetStringArray("file")
 			for _, file := range files {
 				fileContent, err := os.ReadFile(file)
 				if err != nil {
-					fmt.Printf("Error reading file %s: %v\n", file, err)
-					return
+					return fmt.Errorf("read file %s: %w", file, err)
 				}
 				query += "\n" + string(fileContent)
 			}
 
-			data, err := fetchGeminiData(apiConfigForService.URL, apiConfigForService.ApiKey, query)
+			text, err := gemini.NewClient().Generate(context.Background(), cfg, model, query, retries)
 			if err != nil {
-				fmt.Println("Error fetching data:", err)
-				return
+				return err
 			}
-
-			// Parsowanie JSON-a, żeby wyciągnąć tylko tekst odpowiedzi
-			var resp struct {
-				Candidates []struct {
-					Content struct {
-						Parts []struct {
-							Text string `json:"text"`
-						} `json:"parts"`
-					} `json:"content"`
-				} `json:"candidates"`
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), text); err != nil {
+				return fmt.Errorf("write Gemini response: %w", err)
 			}
-			if err := json.Unmarshal([]byte(data), &resp); err != nil {
-				fmt.Println("Error parsing response:", err)
-				return
-			}
-
-			if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-				fmt.Println(resp.Candidates[0].Content.Parts[0].Text)
-			} else {
-				fmt.Println("No response text received.")
-			}
-
+			return nil
 		},
 	}
 
-	// Flags
-	cmd.Flags().StringP("model", "m", "gemini", "The model to use (e.g. gemini or other_service)")
-	cmd.Flags().StringP("query", "q", "", "The query to send to Gemini API")
-	cmd.Flags().StringArrayP("file", "f", []string{}, "Add files to the query")
+	cmd.Flags().StringP("model", "m", "", "Use a Gemini model for this request only")
+	cmd.Flags().StringP("query", "q", "", "The query to send to Gemini")
+	cmd.Flags().StringArrayP("file", "f", nil, "Add a file to the query")
+	cmd.Flags().Int("retries", gemini.DefaultRetries, fmt.Sprintf("Maximum retries for temporary Gemini failures (0-%d)", gemini.MaxRetries))
 
+	modelsCmd := &cobra.Command{
+		Use:   "models",
+		Short: "List Gemini models compatible with the configured API",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			refresh, _ := cmd.Flags().GetBool("refresh")
+			cfg, warnings, err := gemini.LoadConfig()
+			if err != nil {
+				return err
+			}
+			for _, warning := range warnings {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning); err != nil {
+					return err
+				}
+			}
+			models, err := gemini.NewClient().ListModels(context.Background(), cfg, refresh)
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%-42s %-28s %-12s %s\n", "MODEL ID", "DISPLAY NAME", "TOKENS", "CAPABILITIES"); err != nil {
+				return err
+			}
+			for _, model := range models {
+				name := model.DisplayName
+				if strings.TrimSpace(name) == "" {
+					name = "-"
+				}
+				tokens := "-"
+				if model.InputTokenLimit > 0 || model.OutputTokenLimit > 0 {
+					tokens = fmt.Sprintf("%d/%d", model.InputTokenLimit, model.OutputTokenLimit)
+				}
+				capabilities := strings.Join(model.SupportedGenerationMethods, ", ")
+				if capabilities == "" {
+					capabilities = "text generation"
+				}
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%-42s %-28s %-12s %s\n", model.ID(), name, tokens, capabilities); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	modelsCmd.Flags().Bool("refresh", false, "Refresh model data instead of using the cache")
+
+	configCmd := &cobra.Command{
+		Use:   "config",
+		Short: "Inspect or change Gemini configuration",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, warnings, err := gemini.LoadConfig()
+			if err != nil {
+				return err
+			}
+			for _, warning := range warnings {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Warning: %s\n", warning); err != nil {
+					return err
+				}
+			}
+
+			model, _ := cmd.Flags().GetString("model")
+			if strings.TrimSpace(model) != "" {
+				cfg.Model = strings.TrimPrefix(strings.TrimSpace(model), "models/")
+				if err := gemini.SaveConfig(cfg); err != nil {
+					return err
+				}
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Default Gemini model changed to: %s\n", cfg.Model); err != nil {
+					return err
+				}
+				return nil
+			}
+
+			keyStatus := "not configured"
+			if strings.TrimSpace(cfg.APIKey) != "" && cfg.APIKey != "your_gemini_api_key_here" {
+				keyStatus = "configured"
+			} else if strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" {
+				keyStatus = "configured through GEMINI_API_KEY"
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Provider: Gemini\nBase URL: %s\nAPI: %s\nModel: %s\nAPI key: %s\n", cfg.BaseURL, cfg.API, cfg.Model, keyStatus); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	configCmd.Flags().StringP("model", "m", "", "Set the persistent default Gemini model")
+
+	cmd.AddCommand(modelsCmd, configCmd)
 	return cmd
-}
-
-func readApiConfig() (map[string]struct {
-	URL    string `json:"url"`
-	ApiKey string `json:"apiKey"`
-}, error) {
-	exePath, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get executable path: %v", err)
-	}
-
-	dir := filepath.Dir(exePath)
-	configPath := filepath.Join(dir, ".config.json")
-
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		defaultConfig := map[string]struct {
-			URL    string `json:"url"`
-			ApiKey string `json:"apiKey"`
-		}{
-			"gemini": {
-				URL:    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-				ApiKey: "your_gemini_api_key_here",
-			},
-		}
-		configData, _ := json.MarshalIndent(defaultConfig, "", "  ")
-		if err := os.WriteFile(configPath, configData, 0644); err != nil {
-			return nil, fmt.Errorf("failed to create config file %s: %v", configPath, err)
-		}
-		fmt.Println("Config file .config.json created with default values.")
-		return defaultConfig, nil
-	}
-
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %v", configPath, err)
-	}
-
-	var config map[string]struct {
-		URL    string `json:"url"`
-		ApiKey string `json:"apiKey"`
-	}
-	err = json.Unmarshal(content, &config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config file %s: %v", configPath, err)
-	}
-
-	return config, nil
-}
-
-func fetchGeminiData(url, apiKey, query string) (string, error) {
-	requestBody := map[string]any{
-		"contents": []map[string]any{
-			{
-				"parts": []map[string]any{
-					{"text": query},
-				},
-			},
-		},
-	}
-
-	requestBodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %v", err)
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBodyBytes))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-goog-api-key", apiKey)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	return string(body), nil
 }

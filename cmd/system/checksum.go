@@ -41,7 +41,11 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("error opening file %s: %w", filePath, err)
 			}
-			defer file.Close()
+			defer func() {
+				if err := file.Close(); err != nil {
+					l.Error("Failed to close checksum file: %v", err)
+				}
+			}()
 
 			var hasher hash.Hash
 			switch strings.ToLower(algo) {

@@ -8,25 +8,31 @@ import (
 	"path/filepath"
 )
 
-func DecryptFolderAES(encZipPath string, key []byte, outDir string) error {
+func DecryptFolderAES(encZipPath string, key []byte, outDir string) (retErr error) {
 
 	tmpZip := encZipPath + ".tmpzip"
 	if err := DecryptFileAES(encZipPath, key, tmpZip); err != nil {
 		return fmt.Errorf("failed to decrypt zip: %w", err)
 	}
 	defer func() {
-		_ = os.Remove(tmpZip)
+		if err := os.Remove(tmpZip); err != nil && !os.IsNotExist(err) && retErr == nil {
+			retErr = fmt.Errorf("remove temporary zip: %w", err)
+		}
 	}()
 
 	r, err := zip.OpenReader(tmpZip)
 	if err != nil {
 		return fmt.Errorf("failed to open zip: %w", err)
 	}
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil && retErr == nil {
+			retErr = fmt.Errorf("close zip reader: %w", err)
+		}
+	}()
 
 	for _, f := range r.File {
 
-		err := func() error {
+		err := func() (retErr error) {
 			fpath := filepath.Join(outDir, f.Name)
 
 			if f.FileInfo().IsDir() {
@@ -44,18 +50,25 @@ func DecryptFolderAES(encZipPath string, key []byte, outDir string) error {
 			if err != nil {
 				return fmt.Errorf("failed to open output file: %w", err)
 			}
-			defer outFile.Close()
+			defer func() {
+				if err := outFile.Close(); err != nil && retErr == nil {
+					retErr = fmt.Errorf("close extracted file: %w", err)
+				}
+			}()
 
 			rc, err := f.Open()
 			if err != nil {
 				return fmt.Errorf("failed to open zip file content: %w", err)
 			}
-			defer rc.Close()
+			defer func() {
+				if err := rc.Close(); err != nil && retErr == nil {
+					retErr = fmt.Errorf("close zip file content: %w", err)
+				}
+			}()
 
 			if _, err = io.Copy(outFile, rc); err != nil {
-				return fmt.Errorf("failed to copy content to file: %w", err)
+				return fmt.Errorf("failed to copy content: %w", err)
 			}
-
 			return nil
 		}()
 

@@ -22,7 +22,9 @@ func NewDoctorCmd() *cobra.Command {
 					return err
 				}
 			} else {
-				doctor.WriteText(cmd.OutOrStdout(), report, verbose)
+				if err := doctor.WriteText(cmd.OutOrStdout(), report, verbose); err != nil {
+					return err
+				}
 			}
 			if report.Summary.Failed > 0 {
 				return errors.New("doctor checks found failures")

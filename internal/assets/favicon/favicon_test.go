@@ -15,7 +15,7 @@ func writeTestImage(t *testing.T, path string, img image.Image) {
 	if err != nil {
 		t.Fatalf("create image: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if err := png.Encode(f, img); err != nil {
 		t.Fatalf("encode image: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestGenerateFaviconSetPreservesTransparency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open generated favicon: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	decoded, err := png.Decode(f)
 	if err != nil {
 		t.Fatalf("decode generated favicon: %v", err)

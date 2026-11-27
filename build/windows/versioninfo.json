@@ -6,18 +6,18 @@
                            "LegalCopyright":  "",
                            "CompanyName":  "",
                            "LegalTrademarks":  "",
-                           "FileVersion":  "2.1.6",
+                           "FileVersion":  "2.1.7",
                            "PrivateBuild":  "",
                            "InternalName":  "cmdr",
                            "Comments":  "",
                            "ProductName":  "cmdr",
-                           "ProductVersion":  "2.1.6"
+                           "ProductVersion":  "2.1.7-rc.2"
                        },
     "FixedFileInfo":  {
                           "FileVersion":  {
                                               "Minor":  1,
                                               "Build":  0,
-                                              "Patch":  6,
+                                              "Patch":  7,
                                               "Major":  2
                                           },
                           "FileOS":  "040004",
@@ -26,7 +26,7 @@
                           "ProductVersion":  {
                                                  "Minor":  1,
                                                  "Build":  0,
-                                                 "Patch":  6,
+                                                 "Patch":  7,
                                                  "Major":  2
                                              },
                           "FileSubType":  "00",

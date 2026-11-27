@@ -28,3 +28,22 @@ go.work.sum
 **/combined.txt
 **/temp.md
 **/*.patch
+
+# C++ / CMake
+cpp/build/
+cpp/out/
+
+# IDE
+cpp/.vs/
+cpp/.vscode/
+
+# Compiled binaries
+*.exe
+*.obj
+*.o
+*.pdb
+*.ilk
+*.lib
+*.dll
+*.so
+*.a

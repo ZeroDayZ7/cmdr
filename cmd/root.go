@@ -41,7 +41,9 @@ func init() {
 	rootHelp := rootCmd.HelpFunc()
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if cmd == rootCmd {
-			branding.Write(cmd.OutOrStdout())
+			if err := branding.Write(cmd.OutOrStdout()); err != nil {
+				cmd.PrintErrln(err)
+			}
 		}
 		rootHelp(cmd, args)
 	})

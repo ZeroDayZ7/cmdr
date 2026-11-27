@@ -44,24 +44,46 @@ func SupportsColor(w io.Writer) bool {
 	return term != "" && term != "dumb"
 }
 
-func Write(w io.Writer) {
+func Write(w io.Writer) error {
 	name := config.Name
 	version := config.Version
 
 	if SupportsColor(w) {
-		fmt.Fprintf(w, "  %sC%s  %s%s%s\n", green, reset, light, name, reset)
-		fmt.Fprintf(w, "     %sDEVELOPER TOOLKIT · v%s%s\n", muted, version, reset)
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "  %sAutomate your development workflow.%s\n", muted, reset)
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "  %sRun %scmdr --help%s %sto explore commands.%s\n", muted, light, reset, muted, reset)
-		return
+		if _, err := fmt.Fprintf(w, "  %sC%s  %s%s%s\n", green, reset, light, name, reset); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "     %sDEVELOPER TOOLKIT · v%s%s\n", muted, version, reset); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %sAutomate your development workflow.%s\n", muted, reset); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "  %sRun %scmdr --help%s %sto explore commands.%s\n", muted, light, reset, muted, reset); err != nil {
+			return err
+		}
+		return nil
 	}
 
-	fmt.Fprintf(w, "  C  %s\n", name)
-	fmt.Fprintf(w, "     DEVELOPER TOOLKIT · v%s\n", version)
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "  Automate your development workflow.")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "  Run cmdr --help to explore commands.")
+	if _, err := fmt.Fprintf(w, "  C  %s\n", name); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "     DEVELOPER TOOLKIT · v%s\n", version); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w, "  Automate your development workflow."); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(w, "  Run cmdr --help to explore commands."); err != nil {
+		return err
+	}
+	return nil
 }

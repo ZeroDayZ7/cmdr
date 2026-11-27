@@ -41,7 +41,7 @@ func ApplyPlatformUpdate(currentPath, stagedPath string) error {
 		return fmt.Errorf("resolve absolute cmdr executable path: %w", err)
 	}
 	if _, err := os.Stat(helper); err != nil {
-		return fmt.Errorf("Windows update helper executable not found: %s: %w", helper, err)
+		return fmt.Errorf("windows update helper executable not found: %s: %w", helper, err)
 	}
 
 	if err := writeUpdateResult(resultPath, "pending"); err != nil {
@@ -267,7 +267,7 @@ func startDetachedWindowsHelper(helper string, args []string) (*os.Process, erro
 	if err != nil {
 		return nil, err
 	}
-	defer windows.CloseHandle(nulHandle)
+	defer func() { _ = windows.CloseHandle(nulHandle) }()
 
 	startup := windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{})), StdInput: nulHandle, StdOutput: nulHandle, StdErr: nulHandle}
 	startup.Flags = windows.STARTF_USESTDHANDLES

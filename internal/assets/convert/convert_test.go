@@ -29,7 +29,7 @@ func writeTestImage(t *testing.T, path, format string, transparent bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	switch format {
 	case "png":
 		err = png.Encode(f, img)
@@ -50,11 +50,12 @@ func TestConvertCommonPairsAndReopen(t *testing.T) {
 			dir := t.TempDir()
 			srcFormat := pair[0]
 			src := filepath.Join(dir, "source."+srcFormat)
-			if srcFormat == "jpeg" {
+			switch srcFormat {
+			case "jpeg":
 				writeTestImage(t, src, "jpeg", false)
-			} else if srcFormat == "png" {
+			case "png":
 				writeTestImage(t, src, "png", true)
-			} else {
+			default:
 				writeTestImage(t, filepath.Join(dir, "seed.png"), "png", true)
 				if _, err := ConvertImage(filepath.Join(dir, "seed.png"), src, "webp", 85, false, false); err != nil {
 					t.Fatal(err)
@@ -65,7 +66,7 @@ func TestConvertCommonPairsAndReopen(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ConvertImage: %v", err)
 			}
-			if resolved != pair[1] && !(pair[1] == "jpeg" && resolved == "jpeg") {
+			if resolved != pair[1] && (pair[1] != "jpeg" || resolved != "jpeg") {
 				t.Fatalf("format = %q", resolved)
 			}
 			img, gotFormat, err := imageutil.DecodeImage(dst)

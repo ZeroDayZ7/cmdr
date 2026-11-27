@@ -8,17 +8,25 @@ import (
 )
 
 // ZipFolder zips all files from folderPath into zipPath
-func ZipFolder(folderPath, zipPath string) error {
+func ZipFolder(folderPath, zipPath string) (retErr error) {
 	outFile, err := os.Create(zipPath)
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
+	defer func() {
+		if err := outFile.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	zipWriter := zip.NewWriter(outFile)
-	defer zipWriter.Close()
+	defer func() {
+		if err := zipWriter.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
-	return filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+	walkErr := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -40,9 +48,10 @@ func ZipFolder(folderPath, zipPath string) error {
 		if err != nil {
 			return err
 		}
-		defer inFile.Close()
+		defer func() { _ = inFile.Close() }()
 
 		_, err = io.Copy(fw, inFile)
 		return err
 	})
+	return walkErr
 }

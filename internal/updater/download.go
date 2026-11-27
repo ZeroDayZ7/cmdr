@@ -31,7 +31,7 @@ func DownloadToFileWithProgress(url, destination string, maxBytes int64, onProgr
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
@@ -123,7 +123,7 @@ func extractZip(archivePath, destination, binaryName string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open ZIP archive: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	var found string
 	for _, file := range reader.File {
 		if file.FileInfo().Mode()&os.ModeSymlink != 0 {
@@ -143,7 +143,10 @@ func extractZip(archivePath, destination, binaryName string) (string, error) {
 				return "", err
 			}
 			found, err = copyArchiveFile(r, name, 0o755)
-			r.Close()
+			if closeErr := r.Close(); closeErr != nil {
+				_ = os.Remove(name)
+				return "", closeErr
+			}
 			if err != nil {
 				return "", err
 			}
@@ -168,12 +171,12 @@ func extractTarGz(archivePath, destination, binaryName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
 		return "", fmt.Errorf("open tar.gz archive: %w", err)
 	}
-	defer gzipReader.Close()
+	defer func() { _ = gzipReader.Close() }()
 	tarReader := tar.NewReader(gzipReader)
 	var found string
 	for {

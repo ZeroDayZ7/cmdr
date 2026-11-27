@@ -78,16 +78,26 @@ func copyFile(src, dest string, mode os.FileMode) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer srcFile.Close()
 
 	destFile, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer destFile.Close()
+	if destFile == nil {
+		return fmt.Errorf("destination file is nil")
+	}
 
 	if _, err = io.Copy(destFile, srcFile); err != nil {
+		_ = destFile.Close()
+		_ = srcFile.Close()
 		return fmt.Errorf("failed to copy data: %w", err)
+	}
+	if err := destFile.Close(); err != nil {
+		_ = srcFile.Close()
+		return fmt.Errorf("close destination file: %w", err)
+	}
+	if err := srcFile.Close(); err != nil {
+		return fmt.Errorf("close source file: %w", err)
 	}
 
 	return nil

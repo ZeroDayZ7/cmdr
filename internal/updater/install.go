@@ -48,14 +48,18 @@ func PrepareStagedBinary(newBinary, targetDir string) (string, error) {
 		_ = os.Remove(staged)
 		return "", err
 	}
-	defer input.Close()
+	defer func() { _ = input.Close() }()
+
 	output, err := os.OpenFile(staged, os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
 		_ = os.Remove(staged)
 		return "", err
 	}
 	if _, err := output.ReadFrom(input); err != nil {
-		output.Close()
+		if closeErr := output.Close(); closeErr != nil {
+			_ = os.Remove(staged)
+			return "", closeErr
+		}
 		_ = os.Remove(staged)
 		return "", err
 	}

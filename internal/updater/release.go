@@ -68,7 +68,7 @@ func FetchLatestRelease(baseURL string, allowPrerelease bool) (*Release, error) 
 	if err != nil {
 		return nil, fmt.Errorf("GitHub Releases request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitHub Releases returned HTTP %d", resp.StatusCode)
 	}
@@ -177,7 +177,7 @@ func fetchReleaseByTag(tag string, allowPrerelease bool) (*Release, error) {
 	if err != nil {
 		return nil, fmt.Errorf("GitHub Release request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("release %s was not found", tag)
 	}
