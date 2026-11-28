@@ -20,12 +20,11 @@ func newGenerateKeyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "generate-key",
 		Aliases: []string{"gen-key", "gkey", "gk"},
-		Short:   "Generate a cryptographic key pair (RSA, Ed25519, ECDSA)",
+		Short:   "Generate an RSA key pair",
 		Long: `
-Generate a cryptographic key pair and save both private and public keys in a folder.
+Generate an RSA private/public key pair and save it in a folder.
 Defaults to creating a 'keys' folder in the current directory.
-Supports RSA for now, with optional future support for Ed25519 or ECDSA.
-`,
+Supported types: rsa (2048, 3072, or 4096 bits).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Set default folder if not provided
 			if outDir == "" {
@@ -50,10 +49,6 @@ Supports RSA for now, with optional future support for Ed25519 or ECDSA.
 					fmt.Printf("RSA key pair generated successfully in folder: %s\n", outDir)
 				}
 				return err
-			case "ed25519":
-				return fmt.Errorf("Ed25519 key generation not implemented yet")
-			case "ecdsa":
-				return fmt.Errorf("ECDSA key generation not implemented yet")
 			default:
 				return fmt.Errorf("unsupported key type: %s", keyType)
 			}
@@ -61,7 +56,7 @@ Supports RSA for now, with optional future support for Ed25519 or ECDSA.
 	}
 
 	// Flags
-	cmd.Flags().StringVarP(&keyType, "type", "t", "rsa", "Key type (rsa, ed25519, ecdsa)")
+	cmd.Flags().StringVarP(&keyType, "type", "t", "rsa", "Key type (currently supported: rsa)")
 	cmd.Flags().IntVarP(&keySize, "size", "s", 4096, "Key size in bits (RSA only: 2048, 3072, 4096)")
 	cmd.Flags().StringVarP(&outDir, "dir", "d", "", "Output folder for key pair (default: keys)")
 

@@ -17,7 +17,11 @@ func NewPDFCmd() *cobra.Command {
 		Use:   "pdf <directory>",
 		Short: "Create a PDF document from numbered images",
 		Long:  "Create an A4 or Letter PDF from PNG, JPG/JPEG, and WebP files in a directory. Images must start with a numeric prefix.",
-		Args:  cobra.ExactArgs(1),
+		Example: `  cmdr assets pdf ./pages
+  cmdr assets pdf ./pages -o comic-001.pdf
+  cmdr assets pdf ./pages --preset ai --orientation portrait
+  cmdr assets pdf ./pages --recursive --max-size 2MB`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			directory := args[0]
 			files, unnumbered, err := assetpdf.CollectImages(directory, recursive)

@@ -1,6 +1,7 @@
 package general
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -11,19 +12,20 @@ import (
 	"github.com/zerodayz7/cmdr/internal/utils"
 )
 
-var (
-	output          string
-	exclude         []string
-	format          string
-	copyToClipboard bool
-	depth           int
-	log             = &logger.ConsoleLogger{}
-)
-
 func NewTreeCmd() *cobra.Command {
+	var (
+		output          string
+		exclude         []string
+		format          string
+		copyToClipboard bool
+		depth           int
+	)
+	log := &logger.ConsoleLogger{}
+
 	cmd := &cobra.Command{
 		Use:   "tree [path]",
 		Short: "Display a tree view of folders and files",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			genIgnore, _ := cmd.Flags().GetBool("generate-ignore")
 			if genIgnore {
@@ -66,7 +68,7 @@ func NewTreeCmd() *cobra.Command {
 				}
 				log.Success("Tree saved to %s", output)
 			} else if !copyToClipboard {
-				if _, err := os.Stdout.WriteString(result + "\n"); err != nil {
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), result); err != nil {
 					log.Error("Failed to write tree output: %v", err)
 					return err
 				}

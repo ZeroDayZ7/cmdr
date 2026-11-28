@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -18,10 +19,9 @@ func NewCleanCmd() *cobra.Command {
 		Long: `Example usage:
   cmdr clean -d logs
 Deletes all directories named "logs" in the current directory and subdirectories.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if dirName == "" {
-				slog.Warn("No directory name provided. Use -d flag.")
-				return
+				return fmt.Errorf("directory name is required: use -d/--dir")
 			}
 
 			slog.Info("Cleaning folders", "target", dirName)
@@ -47,10 +47,11 @@ Deletes all directories named "logs" in the current directory and subdirectories
 
 			if err != nil {
 				slog.Error("Cleanup process failed", "error", err)
-				os.Exit(1)
+				return err
 			}
 
 			slog.Info("Cleanup completed successfully")
+			return nil
 		},
 	}
 

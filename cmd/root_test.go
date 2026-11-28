@@ -50,3 +50,16 @@ func TestVersionCommandHasNoBanner(t *testing.T) {
 		t.Fatalf("version command unexpectedly included banner:\n%s", out)
 	}
 }
+
+func TestPDFHelpIncludesExamplesAndNumericPrefix(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	out, err := executeForTest("assets", "pdf", "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{"Examples:", "cmdr assets pdf ./pages", "--recursive --max-size 2MB", "numeric prefix"} {
+		if !strings.Contains(out, text) {
+			t.Fatalf("PDF help missing %q:\n%s", text, out)
+		}
+	}
+}
