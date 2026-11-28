@@ -4,6 +4,7 @@ go 1.27.0
 
 require (
 	github.com/chai2010/webp v1.4.0
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.59.0
 	golang.org/x/image v0.48.0

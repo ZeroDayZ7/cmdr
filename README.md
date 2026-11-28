@@ -17,7 +17,7 @@ CMDR is a collection of practical command-line tools designed to simplify everyd
 ## Features
 
 - **Project Management** – detect project structures and bootstrap development environments.
-- **Asset Utilities** – generate favicon sets and resize images.
+- **Asset Utilities** – generate favicon sets, resize and convert images, and create PDFs from numbered images.
 - **Cryptography** – encrypt and decrypt files, generate keys, and create secure random data.
 - **File Management** – combine files, remove comments, and organize project contents.
 - **System Utilities** – inspect processes, manage ports, and perform system operations.
@@ -101,6 +101,12 @@ Resize an image:
 
 ```bash
 cmdr assets resize --input ./source.png --output ./out/resized.jpg --width 1200 --height 800 --fit cover
+```
+
+Create a PDF from numbered images:
+
+```bash
+cmdr assets pdf ./ZeroDayZ7
 ```
 
 Initialize the default assets configuration:

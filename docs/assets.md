@@ -6,6 +6,7 @@ The `assets` command helps prepare image assets for web and application projects
 - `assets resize` — resizes a source image to a target width and height
 - `assets convert` — converts an image between PNG, JPG/JPEG, GIF, and WebP
 - `assets config init` — creates the default asset configuration file
+- `assets pdf` — creates a multipage PDF from numbered PNG, JPG/JPEG, and WebP images
 
 The command group itself only displays help when run without a subcommand.
 
@@ -18,6 +19,7 @@ cmdr assets resize --help
 cmdr assets convert --help
 cmdr assets config --help
 cmdr assets config init --help
+cmdr assets pdf --help
 ```
 
 ## `assets favicon`
@@ -168,6 +170,43 @@ The generated file contains:
 ```
 
 The config file is loaded with default values when it is missing. Supported default and preset formats are `png`, `jpg`, `jpeg`, `gif`, and `webp`.
+
+## `assets pdf`
+
+Creates one PDF page per numbered image found directly in a source directory (or recursively with `--recursive`). The generated PDF is written beside the images by default.
+
+### Usage
+
+```bash
+cmdr assets pdf ./ZeroDayZ7
+cmdr assets pdf ./ZeroDayZ7 --output numer-001.pdf
+cmdr assets pdf ./ZeroDayZ7 --page-size A4
+cmdr assets pdf ./ZeroDayZ7 --orientation portrait
+cmdr assets pdf ./ZeroDayZ7 --margin 5
+cmdr assets pdf ./ZeroDayZ7 --force
+cmdr assets pdf ./ZeroDayZ7 --recursive
+```
+
+Supported page sizes are `A4` and `LETTER`. Supported orientations are `auto`, `portrait`, and `landscape`; `auto` uses each image's proportions. The default margin is `0` mm.
+
+### Numeric filename rules
+
+- Supported names start with digits, for example `1.png`, `001_okladka.png`, or `010_final.jpg`.
+- Sorting uses the numeric prefix; extensions do not affect order.
+- Values such as `1`, `2`, `3`, `10` and `001`, `002`, `010` are sorted numerically.
+- Two files with the same numeric prefix are rejected because their order would be ambiguous.
+- Files without a numeric prefix are skipped and reported.
+
+### Flags
+
+- `--output`, `-o`: custom output PDF name or path
+- `--page-size`: `A4` or `LETTER` (default `A4`)
+- `--orientation`: `auto`, `portrait`, or `landscape` (default `auto`)
+- `--margin`: margin in millimeters (default `0`)
+- `--force`: allow replacing an existing PDF
+- `--recursive`: include supported images in subdirectories
+
+By default, images maintain their aspect ratio and are contained within the usable page area without cropping or stretching. PNG transparency is decoded and composited safely. Source images are never modified or optimized.
 
 ## Supported formats
 
