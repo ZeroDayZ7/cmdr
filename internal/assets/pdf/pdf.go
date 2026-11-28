@@ -149,31 +149,12 @@ func Generate(directory string, options Options) (Result, error) {
 	if !ok {
 		return Result{}, fmt.Errorf("invalid preset %q", preset)
 	}
-	base := filepath.Clean(directory)
-	outputName := strings.TrimSpace(options.OutputName)
-	if outputName == "" {
-		name := filepath.Base(base)
-		if name == "." || name == string(filepath.Separator) {
-			name = "cmdr"
-		}
-		outputName = name + ".pdf"
+	_, outputPath, err := resolveOutputPath(directory, options.OutputName)
+	if err != nil {
+		return Result{}, err
 	}
-	if !strings.HasSuffix(strings.ToLower(outputName), ".pdf") {
-		outputName += ".pdf"
-	}
-	var outputPath string
-	if filepath.IsAbs(outputName) || filepath.Dir(outputName) != "." {
-		outputPath = filepath.Clean(outputName)
-	} else {
-		outputPath = filepath.Join(base, outputName)
-	}
-	if _, err := os.Stat(outputPath); err == nil && !options.Overwrite {
-		return Result{}, fmt.Errorf("output file already exists: %s (use --force to overwrite)", outputPath)
-	} else if err != nil && !os.IsNotExist(err) {
-		return Result{}, fmt.Errorf("check output file %s: %w", outputPath, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return Result{}, fmt.Errorf("create output directory: %w", err)
+	if err := validateOutputDestination(outputPath, options.Overwrite); err != nil {
+		return Result{}, err
 	}
 
 	var finalResult Result
@@ -185,6 +166,7 @@ func Generate(directory string, options Options) (Result, error) {
 		candidatePath := candidate.Name()
 		_ = candidate.Close()
 		_ = os.Remove(candidatePath)
+		defer func(path string) { _ = os.Remove(path) }(candidatePath)
 
 		attempt := options
 		attempt.Preset = preset
@@ -272,55 +254,17 @@ func generateOnce(directory string, options Options) (Result, error) {
 		return Result{}, fmt.Errorf("source path is not a directory: %s", directory)
 	}
 
-	outputName := strings.TrimSpace(options.OutputName)
-	if outputName == "" {
-		name := filepath.Base(filepath.Clean(directory))
-		if name == "." || name == string(filepath.Separator) {
-			name = "cmdr"
-		}
-		outputName = name + ".pdf"
+	_, outputPath, err := resolveOutputPath(directory, options.OutputName)
+	if err != nil {
+		return Result{}, err
 	}
-	if !strings.HasSuffix(strings.ToLower(outputName), ".pdf") {
-		outputName += ".pdf"
-	}
-	var outputPath string
-	if filepath.IsAbs(outputName) || filepath.Dir(outputName) != "." {
-		outputPath = filepath.Clean(outputName)
-	} else {
-		outputPath = filepath.Join(base, outputName)
+	if err := validateOutputDestination(outputPath, options.Overwrite); err != nil {
+		return Result{}, err
 	}
 
-	if _, err := os.Stat(outputPath); err == nil && !options.Overwrite {
-		return Result{}, fmt.Errorf("output file already exists: %s (use --force to overwrite)", outputPath)
-	} else if err != nil && !os.IsNotExist(err) {
-		return Result{}, fmt.Errorf("check output file %s: %w", outputPath, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return Result{}, fmt.Errorf("create output directory: %w", err)
-	}
-
-	pageSize := strings.ToUpper(strings.TrimSpace(options.PageSize))
-	if pageSize == "" {
-		pageSize = "A4"
-	}
-	var size fpdf.SizeType
-	switch pageSize {
-	case "A4":
-		size = fpdf.SizeType{Wd: 210, Ht: 297}
-	case "LETTER":
-		size = fpdf.SizeType{Wd: 215.9, Ht: 279.4}
-	default:
-		return Result{}, fmt.Errorf("unsupported page size %q: expected A4 or LETTER", pageSize)
-	}
-	orientation := strings.ToLower(strings.TrimSpace(options.Orientation))
-	if orientation == "" {
-		orientation = "auto"
-	}
-	if orientation != "auto" && orientation != "portrait" && orientation != "landscape" {
-		return Result{}, fmt.Errorf("invalid orientation %q: expected auto, portrait, or landscape", orientation)
-	}
-	if options.MarginMM < 0 {
-		return Result{}, fmt.Errorf("margin must be zero or positive millimeters")
+	size, orientation, err := resolvePageLayout(options.PageSize, options.Orientation, options.MarginMM)
+	if err != nil {
+		return Result{}, err
 	}
 
 	tmp, err := os.CreateTemp(filepath.Dir(outputPath), ".cmdr-pdf-*.tmp")
@@ -329,26 +273,23 @@ func generateOnce(directory string, options Options) (Result, error) {
 	}
 	tmpPath := tmp.Name()
 	_ = tmp.Close()
-	cleanup := func() { _ = os.Remove(tmpPath) }
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetCompression(true)
 	formats := make(map[string]int)
 	originalImageBytes, err := originalImageBytes(files)
 	if err != nil {
-		cleanup()
 		return Result{}, fmt.Errorf("measure source images: %w", err)
 	}
 	optimizedImageBytes := int64(0)
 	for _, file := range files {
 		img, _, err := imageutil.DecodeImage(file.Path)
 		if err != nil {
-			cleanup()
 			return Result{}, fmt.Errorf("decode image %s: %w", file.Name, err)
 		}
 		bounds := img.Bounds()
 		if bounds.Dx() <= 0 || bounds.Dy() <= 0 {
-			cleanup()
 			return Result{}, fmt.Errorf("decoded image %s has invalid dimensions", file.Name)
 		}
 
@@ -383,7 +324,6 @@ func generateOnce(directory string, options Options) (Result, error) {
 		}
 		optimized, err := optimizeImageWithSize(img, normalizePresetForFallback(options.Preset), level, pageForImage)
 		if err != nil {
-			cleanup()
 			return Result{}, fmt.Errorf("optimize image %s: %w", file.Name, err)
 		}
 		optimizedImageBytes += int64(len(optimized.Data))
@@ -393,7 +333,6 @@ func generateOnce(directory string, options Options) (Result, error) {
 		contentW := pageW - 2*options.MarginMM
 		contentH := pageH - 2*options.MarginMM
 		if contentW <= 0 || contentH <= 0 {
-			cleanup()
 			return Result{}, errors.New("margin leaves no usable page area")
 		}
 		w, h := float64(optimized.Width), float64(optimized.Height)
@@ -407,30 +346,93 @@ func generateOnce(directory string, options Options) (Result, error) {
 		pdf.RegisterImageOptionsReader(file.Name, fpdf.ImageOptions{ImageType: optimized.Format, ReadDpi: false}, bytes.NewReader(optimized.Data))
 		pdf.ImageOptions(file.Name, x, y, drawW, drawH, false, fpdf.ImageOptions{ImageType: optimized.Format}, 0, "")
 		if pdf.Error() != nil {
-			cleanup()
 			return Result{}, fmt.Errorf("generate PDF page for %s: %w", file.Name, pdf.Error())
 		}
 		formats[file.Format]++
 	}
 
 	if err := pdf.OutputFileAndClose(tmpPath); err != nil {
-		cleanup()
 		return Result{}, fmt.Errorf("generate PDF: %w", err)
 	}
 	if err := os.Rename(tmpPath, outputPath); err != nil {
 		if options.Overwrite {
 			if removeErr := os.Remove(outputPath); removeErr != nil && !os.IsNotExist(removeErr) {
-				cleanup()
 				return Result{}, fmt.Errorf("replace output PDF %s: %w", outputPath, removeErr)
 			}
 			if renameErr := os.Rename(tmpPath, outputPath); renameErr != nil {
-				cleanup()
 				return Result{}, fmt.Errorf("save output PDF %s: %w", outputPath, renameErr)
 			}
 		} else {
-			cleanup()
 			return Result{}, fmt.Errorf("save output PDF %s: %w", outputPath, err)
 		}
 	}
 	return Result{OutputPath: outputPath, Files: files, Formats: formats, OriginalImageBytes: originalImageBytes, OptimizedImageBytes: optimizedImageBytes}, nil
+}
+
+func resolveOutputPath(directory, outputName string) (string, string, error) {
+	base := filepath.Clean(directory)
+	outputName = strings.TrimSpace(outputName)
+	if outputName == "" {
+		name := filepath.Base(base)
+		if name == "." || name == string(filepath.Separator) {
+			name = "cmdr"
+		}
+		outputName = name + ".pdf"
+	}
+	if !strings.HasSuffix(strings.ToLower(outputName), ".pdf") {
+		outputName += ".pdf"
+	}
+	outputPath := filepath.Clean(outputName)
+	if !filepath.IsAbs(outputName) && filepath.Dir(outputName) == "." {
+		outputPath = filepath.Join(base, outputName)
+	}
+	return base, outputPath, nil
+}
+
+func validateOutputDestination(outputPath string, overwrite bool) error {
+	if _, err := os.Stat(outputPath); err == nil && !overwrite {
+		return fmt.Errorf("output file already exists: %s (use --force to overwrite)", outputPath)
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("check output file %s: %w", outputPath, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return fmt.Errorf("create output directory: %w", err)
+	}
+	return nil
+}
+
+func resolvePageLayout(pageSize, orientation string, margin float64) (fpdf.SizeType, string, error) {
+	pageSize = strings.ToUpper(strings.TrimSpace(pageSize))
+	if pageSize == "" {
+		pageSize = "A4"
+	}
+	var size fpdf.SizeType
+	switch pageSize {
+	case "A4":
+		size = fpdf.SizeType{Wd: 210, Ht: 297}
+	case "LETTER":
+		size = fpdf.SizeType{Wd: 215.9, Ht: 279.4}
+	default:
+		return fpdf.SizeType{}, "", fmt.Errorf("unsupported page size %q: expected A4 or LETTER", pageSize)
+	}
+	orientation = strings.ToLower(strings.TrimSpace(orientation))
+	if orientation == "" {
+		orientation = "auto"
+	}
+	if orientation != "auto" && orientation != "portrait" && orientation != "landscape" {
+		return fpdf.SizeType{}, "", fmt.Errorf("invalid orientation %q: expected auto, portrait, or landscape", orientation)
+	}
+	if margin < 0 {
+		return fpdf.SizeType{}, "", errors.New("margin must be zero or positive millimeters")
+	}
+	for _, actual := range []string{"portrait", "landscape"} {
+		width, height := size.Wd, size.Ht
+		if actual == "landscape" {
+			width, height = size.Ht, size.Wd
+		}
+		if margin*2 >= width || margin*2 >= height {
+			return fpdf.SizeType{}, "", fmt.Errorf("margin %g mm leaves no usable page area on %s %s", margin, pageSize, actual)
+		}
+	}
+	return size, orientation, nil
 }

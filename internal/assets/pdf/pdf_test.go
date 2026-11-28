@@ -261,6 +261,39 @@ func TestMaxSizeUnreachableReportsMinimumLevel(t *testing.T) {
 	}
 }
 
+func TestMarginValidation(t *testing.T) {
+	for _, tc := range []struct {
+		pageSize string
+		margin   float64
+	}{
+		{"A4", -1},
+		{"A4", 105},
+		{"LETTER", 108},
+	} {
+		if _, _, err := resolvePageLayout(tc.pageSize, "auto", tc.margin); err == nil {
+			t.Fatalf("expected invalid margin %g for %s", tc.margin, tc.pageSize)
+		}
+	}
+	for _, tc := range []struct {
+		pageSize    string
+		orientation string
+		margin      float64
+	}{
+		{"A4", "portrait", 10},
+		{"A4", "landscape", 10},
+		{"LETTER", "portrait", 5},
+		{"LETTER", "landscape", 5},
+	} {
+		size, resolvedOrientation, err := resolvePageLayout(tc.pageSize, tc.orientation, tc.margin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if size.Wd <= 0 || size.Ht <= 0 || resolvedOrientation != tc.orientation {
+			t.Fatalf("unexpected layout: %+v, %s", size, resolvedOrientation)
+		}
+	}
+}
+
 func TestDPIUsesLETTERAndMargins(t *testing.T) {
 	img := image.NewNRGBA(image.Rect(0, 0, 1200, 800))
 	letterPortrait := fpdfSize{w: 215.9 - 10, h: 279.4 - 10}
@@ -313,5 +346,31 @@ func TestForceReplacementLeavesNoTemporaryPDFs(t *testing.T) {
 		if strings.Contains(name, ".cmdr-candidate-") || strings.Contains(name, ".cmdr-backup-") {
 			t.Fatalf("temporary PDF remains: %s", name)
 		}
+	}
+}
+
+func TestExistingPDFRemainsIntactOnGenerationError(t *testing.T) {
+	dir := t.TempDir()
+	writeImage(t, filepath.Join(dir, "001_image.png"), 40, 60, "png")
+	first, err := Generate(dir, Options{Preset: "print", Overwrite: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(first.OutputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "001_image.png"), []byte("invalid image"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Generate(dir, Options{Preset: "print", Overwrite: true}); err == nil {
+		t.Fatal("expected generation error for corrupted source")
+	}
+	after, err := os.ReadFile(first.OutputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("existing PDF changed after failed generation")
 	}
 }
