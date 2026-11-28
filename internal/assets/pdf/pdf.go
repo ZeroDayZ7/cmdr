@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"image/png"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,12 +15,15 @@ import (
 )
 
 type Options struct {
-	OutputName  string
-	PageSize    string
-	Orientation string
-	MarginMM    float64
-	Recursive   bool
-	Overwrite   bool
+	OutputName   string
+	PageSize     string
+	Orientation  string
+	MarginMM     float64
+	Recursive    bool
+	Overwrite    bool
+	Preset       string
+	MaxSizeBytes int64
+	qualityLevel QualityLevel
 }
 
 type ImageFile struct {
@@ -32,9 +34,17 @@ type ImageFile struct {
 }
 
 type Result struct {
-	OutputPath string
-	Files      []ImageFile
-	Formats    map[string]int
+	OutputPath          string
+	Files               []ImageFile
+	Formats             map[string]int
+	Preset              string
+	OriginalImageBytes  int64
+	OptimizedImageBytes int64
+	PDFBytes            int64
+	SizeLimitReached    bool
+	QualityDPI          int
+	JPEGQuality         int
+	BackupPath          string
 }
 
 func isSupportedFormat(path string) (string, bool) {
@@ -131,6 +141,125 @@ func CollectImages(directory string, recursive bool) ([]ImageFile, []string, err
 }
 
 func Generate(directory string, options Options) (Result, error) {
+	preset, err := NormalizePreset(options.Preset)
+	if err != nil {
+		return Result{}, err
+	}
+	profile, ok := GetProfile(preset)
+	if !ok {
+		return Result{}, fmt.Errorf("invalid preset %q", preset)
+	}
+	base := filepath.Clean(directory)
+	outputName := strings.TrimSpace(options.OutputName)
+	if outputName == "" {
+		name := filepath.Base(base)
+		if name == "." || name == string(filepath.Separator) {
+			name = "cmdr"
+		}
+		outputName = name + ".pdf"
+	}
+	if !strings.HasSuffix(strings.ToLower(outputName), ".pdf") {
+		outputName += ".pdf"
+	}
+	var outputPath string
+	if filepath.IsAbs(outputName) || filepath.Dir(outputName) != "." {
+		outputPath = filepath.Clean(outputName)
+	} else {
+		outputPath = filepath.Join(base, outputName)
+	}
+	if _, err := os.Stat(outputPath); err == nil && !options.Overwrite {
+		return Result{}, fmt.Errorf("output file already exists: %s (use --force to overwrite)", outputPath)
+	} else if err != nil && !os.IsNotExist(err) {
+		return Result{}, fmt.Errorf("check output file %s: %w", outputPath, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return Result{}, fmt.Errorf("create output directory: %w", err)
+	}
+
+	var finalResult Result
+	for index, level := range profile.Levels {
+		candidate, err := os.CreateTemp(filepath.Dir(outputPath), ".cmdr-candidate-*.pdf")
+		if err != nil {
+			return Result{}, fmt.Errorf("create candidate PDF: %w", err)
+		}
+		candidatePath := candidate.Name()
+		_ = candidate.Close()
+		_ = os.Remove(candidatePath)
+
+		attempt := options
+		attempt.Preset = preset
+		attempt.OutputName = candidatePath
+		attempt.Overwrite = true
+		attempt.qualityLevel = level
+		result, err := generateOnce(directory, attempt)
+		if err != nil {
+			_ = os.Remove(candidatePath)
+			return Result{}, err
+		}
+		info, err := os.Stat(candidatePath)
+		if err != nil {
+			_ = os.Remove(candidatePath)
+			return Result{}, fmt.Errorf("measure generated PDF: %w", err)
+		}
+		if !info.Mode().IsRegular() {
+			_ = os.Remove(candidatePath)
+			return Result{}, fmt.Errorf("generated PDF is not a regular file: %s", candidatePath)
+		}
+		result.PDFBytes = info.Size()
+		result.Preset = preset
+		result.QualityDPI = level.DPI
+		result.JPEGQuality = level.JPEGQuality
+		result.SizeLimitReached = options.MaxSizeBytes <= 0 || result.PDFBytes <= options.MaxSizeBytes
+		finalResult = result
+
+		if options.MaxSizeBytes <= 0 || result.PDFBytes <= options.MaxSizeBytes {
+			break
+		}
+		if index < len(profile.Levels)-1 {
+			_ = os.Remove(candidatePath)
+		}
+	}
+
+	candidatePath := finalResult.OutputPath
+	if options.Overwrite {
+		if _, err := os.Stat(outputPath); err == nil {
+			backup, err := os.CreateTemp(filepath.Dir(outputPath), ".cmdr-backup-*.pdf")
+			if err != nil {
+				_ = os.Remove(candidatePath)
+				return Result{}, fmt.Errorf("create PDF backup: %w", err)
+			}
+			backupPath := backup.Name()
+			_ = backup.Close()
+			_ = os.Remove(backupPath)
+			if err := os.Rename(outputPath, backupPath); err != nil {
+				_ = os.Remove(candidatePath)
+				return Result{}, fmt.Errorf("prepare existing PDF backup: %w", err)
+			}
+			if err := os.Rename(candidatePath, outputPath); err != nil {
+				rollbackErr := os.Rename(backupPath, outputPath)
+				_ = os.Remove(candidatePath)
+				if rollbackErr != nil {
+					return Result{}, fmt.Errorf("save output PDF %s: %w; rollback failed; previous PDF preserved as %s: %v", outputPath, err, backupPath, rollbackErr)
+				}
+				return Result{}, fmt.Errorf("save output PDF %s: %w; existing PDF restored", outputPath, err)
+			}
+			_ = os.Remove(backupPath)
+			finalResult.OutputPath = outputPath
+			return finalResult, nil
+		} else if !os.IsNotExist(err) {
+			_ = os.Remove(candidatePath)
+			return Result{}, fmt.Errorf("check existing output PDF: %w", err)
+		}
+	}
+	if err := os.Rename(candidatePath, outputPath); err != nil {
+		_ = os.Remove(candidatePath)
+		return Result{}, fmt.Errorf("save output PDF %s: %w", outputPath, err)
+	}
+	finalResult.OutputPath = outputPath
+	return finalResult, nil
+}
+
+func generateOnce(directory string, options Options) (Result, error) {
 	files, _, err := CollectImages(directory, options.Recursive)
 	if err != nil {
 		return Result{}, err
@@ -205,6 +334,12 @@ func Generate(directory string, options Options) (Result, error) {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetCompression(true)
 	formats := make(map[string]int)
+	originalImageBytes, err := originalImageBytes(files)
+	if err != nil {
+		cleanup()
+		return Result{}, fmt.Errorf("measure source images: %w", err)
+	}
+	optimizedImageBytes := int64(0)
 	for _, file := range files {
 		img, _, err := imageutil.DecodeImage(file.Path)
 		if err != nil {
@@ -217,12 +352,14 @@ func Generate(directory string, options Options) (Result, error) {
 			return Result{}, fmt.Errorf("decoded image %s has invalid dimensions", file.Name)
 		}
 
-		var pngBuf bytes.Buffer
-		if err := png.Encode(&pngBuf, img); err != nil {
-			cleanup()
-			return Result{}, fmt.Errorf("prepare image %s: %w", file.Name, err)
+		level := options.qualityLevel
+		if level.DPI == 0 && level.JPEGQuality == 0 {
+			profile, ok := GetProfile(normalizePresetForFallback(options.Preset))
+			if ok {
+				level = profile.Levels[0]
+			}
 		}
-
+		pageForImage := fpdfSize{w: size.Wd, h: size.Ht}
 		actualOrientation := orientation
 		if orientation == "auto" {
 			if bounds.Dx() > bounds.Dy() {
@@ -231,6 +368,26 @@ func Generate(directory string, options Options) (Result, error) {
 				actualOrientation = "portrait"
 			}
 		}
+		if actualOrientation == "landscape" {
+			pageForImage.w, pageForImage.h = size.Ht, size.Wd
+		} else {
+			pageForImage.w, pageForImage.h = size.Wd, size.Ht
+		}
+		pageForImage.w -= 2 * options.MarginMM
+		pageForImage.h -= 2 * options.MarginMM
+		if pageForImage.w < 1 {
+			pageForImage.w = 1
+		}
+		if pageForImage.h < 1 {
+			pageForImage.h = 1
+		}
+		optimized, err := optimizeImageWithSize(img, normalizePresetForFallback(options.Preset), level, pageForImage)
+		if err != nil {
+			cleanup()
+			return Result{}, fmt.Errorf("optimize image %s: %w", file.Name, err)
+		}
+		optimizedImageBytes += int64(len(optimized.Data))
+
 		pdf.AddPageFormat(actualOrientation, size)
 		pageW, pageH := pdf.GetPageSize()
 		contentW := pageW - 2*options.MarginMM
@@ -239,7 +396,7 @@ func Generate(directory string, options Options) (Result, error) {
 			cleanup()
 			return Result{}, errors.New("margin leaves no usable page area")
 		}
-		w, h := float64(bounds.Dx()), float64(bounds.Dy())
+		w, h := float64(optimized.Width), float64(optimized.Height)
 		scale := contentW / w
 		if contentH/h < scale {
 			scale = contentH / h
@@ -247,8 +404,8 @@ func Generate(directory string, options Options) (Result, error) {
 		drawW, drawH := w*scale, h*scale
 		x := options.MarginMM + (contentW-drawW)/2
 		y := options.MarginMM + (contentH-drawH)/2
-		pdf.RegisterImageOptionsReader(file.Name, fpdf.ImageOptions{ImageType: "png", ReadDpi: false}, bytes.NewReader(pngBuf.Bytes()))
-		pdf.ImageOptions(file.Name, x, y, drawW, drawH, false, fpdf.ImageOptions{ImageType: "png"}, 0, "")
+		pdf.RegisterImageOptionsReader(file.Name, fpdf.ImageOptions{ImageType: optimized.Format, ReadDpi: false}, bytes.NewReader(optimized.Data))
+		pdf.ImageOptions(file.Name, x, y, drawW, drawH, false, fpdf.ImageOptions{ImageType: optimized.Format}, 0, "")
 		if pdf.Error() != nil {
 			cleanup()
 			return Result{}, fmt.Errorf("generate PDF page for %s: %w", file.Name, pdf.Error())
@@ -275,5 +432,5 @@ func Generate(directory string, options Options) (Result, error) {
 			return Result{}, fmt.Errorf("save output PDF %s: %w", outputPath, err)
 		}
 	}
-	return Result{OutputPath: outputPath, Files: files, Formats: formats}, nil
+	return Result{OutputPath: outputPath, Files: files, Formats: formats, OriginalImageBytes: originalImageBytes, OptimizedImageBytes: optimizedImageBytes}, nil
 }

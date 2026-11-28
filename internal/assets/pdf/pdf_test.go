@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/chai2010/webp"
@@ -165,5 +167,151 @@ func TestEmptyAndInvalidDirectory(t *testing.T) {
 	}
 	if _, _, err := CollectImages(t.TempDir(), false); err == nil {
 		t.Fatal("expected empty directory error")
+	}
+}
+
+func TestProfilesAndParseSize(t *testing.T) {
+	for _, preset := range []string{"print", "balanced", "ai", "preview"} {
+		if _, err := NormalizePreset(preset); err != nil {
+			t.Fatalf("preset %s: %v", preset, err)
+		}
+	}
+	if _, err := NormalizePreset("invalid"); err == nil {
+		t.Fatal("expected invalid preset error")
+	}
+	cases := map[string]int64{"800KB": 800000, "2MB": 2000000, "64KIB": 65536, "100B": 100}
+	for input, want := range cases {
+		got, err := ParseSize(input)
+		if err != nil || got != want {
+			t.Fatalf("ParseSize(%s) = %d, %v; want %d", input, got, err, want)
+		}
+	}
+}
+
+func TestParseSizeRejectsInvalidAndOverflow(t *testing.T) {
+	for _, input := range []string{"0KB", "-1MB", "1XB", "999999999999999999999999MB"} {
+		if _, err := ParseSize(input); err == nil {
+			t.Fatalf("ParseSize(%q) should fail", input)
+		}
+	}
+	if got, err := ParseSize(" 800KB "); err != nil || got != 800000 {
+		t.Fatalf("ParseSize whitespace = %d, %v", got, err)
+	}
+}
+
+func TestResizePreservesAspectRatioAndAlphaComposites(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 400, 200))
+	for y := 0; y < 200; y++ {
+		for x := 0; x < 400; x++ {
+			img.SetNRGBA(x, y, color.NRGBA{R: 200, G: 30, B: 80, A: uint8(x % 256)})
+		}
+	}
+	resized, w, h := resizeToDPI(img, 96, fpdfSize{w: 210, h: 297})
+	if w != 400 || h != 200 {
+		if float64(w)/float64(h) < 1.9 || float64(w)/float64(h) > 2.1 {
+			t.Fatalf("aspect ratio changed: %dx%d", w, h)
+		}
+	}
+	level := QualityLevel{DPI: 96, JPEGQuality: 70}
+	data, typ, err := optimizeImage(img, "ai", level, fpdfSize{w: 210, h: 297})
+	if err != nil || typ != "jpg" || len(data) == 0 {
+		t.Fatalf("optimized image: type=%s size=%d err=%v", typ, len(data), err)
+	}
+	if resized.Bounds().Empty() {
+		t.Fatal("resized image is empty")
+	}
+}
+
+func TestPrintPresetKeeepsPNGAndPreservesSource(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "001_source.png")
+	writeImage(t, path, 40, 60, "png")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Generate(dir, Options{Preset: "print", PageSize: "A4", Orientation: "auto", Overwrite: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("print preset modified source image")
+	}
+	if result.Preset != "print" || result.PDFBytes <= 0 {
+		t.Fatalf("unexpected print result: %+v", result)
+	}
+}
+
+func TestMaxSizeUnreachableReportsMinimumLevel(t *testing.T) {
+	dir := t.TempDir()
+	writeImage(t, filepath.Join(dir, "001_image.png"), 800, 800, "png")
+	result, err := Generate(dir, Options{Preset: "preview", MaxSizeBytes: 1, Overwrite: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SizeLimitReached {
+		t.Fatal("tiny 1-byte limit unexpectedly reached")
+	}
+	if result.QualityDPI != 72 {
+		t.Fatalf("minimum preview DPI = %d, want 72", result.QualityDPI)
+	}
+}
+
+func TestDPIUsesLETTERAndMargins(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 1200, 800))
+	letterPortrait := fpdfSize{w: 215.9 - 10, h: 279.4 - 10}
+	resized, w, h := resizeToDPI(img, 96, letterPortrait)
+	if resized == nil || w <= 0 || h <= 0 {
+		t.Fatal("LETTER DPI resize returned empty dimensions")
+	}
+	if float64(w)/float64(h) < 1.49 || float64(w)/float64(h) > 1.51 {
+		t.Fatalf("LETTER resize changed aspect ratio: %dx%d", w, h)
+	}
+}
+
+func TestAlphaCompositesToWhiteWithoutBoundsShift(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(10, 20, 12, 22))
+	img.SetNRGBA(10, 20, color.NRGBA{R: 255, G: 0, B: 0, A: 128})
+	img.SetNRGBA(11, 21, color.NRGBA{R: 0, G: 0, B: 255, A: 0})
+	optimized, err := optimizeImageWithSize(img, "ai", QualityLevel{DPI: 96, JPEGQuality: 100}, fpdfSize{w: 210, h: 297})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := jpeg.Decode(bytes.NewReader(optimized.Data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	red := color.RGBAModel.Convert(decoded.At(0, 0)).(color.RGBA)
+	if red.R <= red.G || red.R <= red.B {
+		t.Fatalf("unexpected composited red pixel: %+v", red)
+	}
+	corner := color.RGBAModel.Convert(decoded.At(1, 1)).(color.RGBA)
+	if corner.R < 245 || corner.G < 245 || corner.B < 245 {
+		t.Fatalf("transparent pixel was not white: %+v", corner)
+	}
+}
+
+func TestForceReplacementLeavesNoTemporaryPDFs(t *testing.T) {
+	dir := t.TempDir()
+	writeImage(t, filepath.Join(dir, "001_image.png"), 40, 40, "png")
+	if _, err := Generate(dir, Options{Preset: "print", Overwrite: false}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Generate(dir, Options{Preset: "ai", Overwrite: true}); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.Contains(name, ".cmdr-candidate-") || strings.Contains(name, ".cmdr-backup-") {
+			t.Fatalf("temporary PDF remains: %s", name)
+		}
 	}
 }

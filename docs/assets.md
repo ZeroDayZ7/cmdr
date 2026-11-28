@@ -205,6 +205,26 @@ Supported page sizes are `A4` and `LETTER`. Supported orientations are `auto`, `
 - `--margin`: margin in millimeters (default `0`)
 - `--force`: allow replacing an existing PDF
 - `--recursive`: include supported images in subdirectories
+- `--preset`: `print`, `balanced`, `ai`, or `preview` (default `print`)
+- `--max-size`: optional target PDF size, such as `800KB` or `2MB`
+
+### Quality presets
+
+- `print` (default): preserves the existing behavior, encodes images as PNG and adds no intentional lossy compression.
+- `balanced`: limits pages to approximately 200 DPI initially, then uses 180/160 DPI and JPEG quality 82/75/68 when a size limit requires retries.
+- `ai`: uses approximately 144 DPI and JPEG quality 70 initially, with readability-focused retries at 132/68, 120/65, 108/62, and 96/58.
+- `preview`: uses approximately 96 DPI and JPEG quality 55, with lower 80/50 and 72/45 retry levels.
+
+Profiles containing JPEG convert WebP and alpha-bearing images into JPEG with controlled white background compositing. Source files remain unchanged.
+
+```bash
+cmdr assets pdf . --preset print
+cmdr assets pdf . --recursive --preset ai
+cmdr assets pdf . --recursive --preset ai --max-size 800KB
+cmdr assets pdf . --preset preview --output preview.pdf
+```
+
+`--max-size` accepts B, KB, MB, KIB, or MIB units. If the final PDF remains above the limit after all retry levels, CMDR preserves the minimum readable retry level and reports the measured size instead of failing.
 
 By default, images maintain their aspect ratio and are contained within the usable page area without cropping or stretching. PNG transparency is decoded and composited safely. Source images are never modified or optimized.
 
